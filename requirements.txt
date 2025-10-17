@@ -1,0 +1,40 @@
+# AI & LangChain
+langchain==0.3.7
+langchain-openai==0.2.5
+langchain-community==0.3.5
+openai==1.54.4
+
+# Vector Database
+chromadb==0.5.20
+
+# Google Sheets Integration
+gspread==6.1.4
+oauth2client==4.1.3
+google-api-python-client==2.154.0
+google-auth==2.36.0
+google-auth-oauthlib==1.2.1
+google-auth-httplib2==0.2.0
+
+# Data & Validation
+pydantic==2.10.1
+pydantic-settings==2.6.1
+python-dotenv==1.0.1
+
+# HTTP & API
+requests==2.32.3
+httpx==0.27.2
+
+# CLI & Progress
+tqdm==4.67.1
+rich==13.9.4
+
+# MCP Server
+mcp==1.1.2
+
+# Web Framework (optional webhook server)
+fastapi==0.115.5
+uvicorn==0.32.1
+
+# Testing
+pytest==8.3.3
+pytest-asyncio==0.24.0
