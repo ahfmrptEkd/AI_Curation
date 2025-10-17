@@ -5,10 +5,9 @@ Uses GPT-4o-mini to analyze reviews and extract emotion hashtags.
 
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
-from typing import List
-import re
-
+from typing import List, Dict
 from src.config import settings
+from src.data.models import Book
 
 
 class TagGenerator:
@@ -148,6 +147,63 @@ Extract emotion tags:""")
 
         # Limit to 3 tags
         return valid_tags[:3]
+
+    def generate_tags_batch(self, books: List[Book]) -> Dict[str, List[str]]:
+        """
+        Generate emotion tags for multiple books in batch.
+        Uses LLM batch processing for better performance and cost efficiency.
+
+        Args:
+            books: List of Book objects
+
+        Returns:
+            Dictionary mapping book titles to their tags
+        """
+        if not books:
+            return {}
+
+        print(f"Processing {len(books)} books in batch...")
+
+        # Prepare all prompts
+        prompts = []
+        for book in books:
+            prompt = self.prompt_template.format_messages(
+                title=book.title,
+                rating=book.rating,
+                review=book.review
+            )
+            prompts.append(prompt)
+
+        # Batch invoke (parallel processing)
+        try:
+            responses = self.llm.batch(prompts)
+
+            # Process results
+            results = {}
+            for book, response in zip(books, responses):
+                try:
+                    tags_string = response.content.strip()
+                    tags = self._parse_tags(tags_string)
+                    valid_tags = self._validate_tags(tags)
+                    results[book.title] = valid_tags
+                    print(f"✓ {book.title}: {', '.join(valid_tags)}")
+                except Exception as e:
+                    print(f"✗ Error processing '{book.title}': {e}")
+                    results[book.title] = ["#생각이많아지는"]  # Fallback
+
+            return results
+
+        except Exception as e:
+            print(f"Batch processing error: {e}")
+            print("Falling back to sequential processing...")
+
+            # Fallback: sequential processing
+            results = {}
+            for book in books:
+                tags = self.generate_tags(book.title, book.rating, book.review)
+                results[book.title] = tags
+
+            return results
 
 
 if __name__ == "__main__":
