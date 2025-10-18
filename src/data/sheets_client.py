@@ -26,18 +26,26 @@ SCOPES = [
 class SheetsClient:
     """Client for interacting with Google Sheets."""
 
-    def __init__(self, use_service_account: bool = True):
+    def __init__(self, use_service_account: bool = True, worksheets: Optional[List[str]] = None):
         """
         Initialize gspread client with credentials.
 
         Args:
             use_service_account: If True, use Service Account authentication (recommended for production).
                                 If False, use OAuth2 flow (requires browser).
+            worksheets: List of worksheet names to read from. If None, reads from ["2023", "2024", "2025"].
         """
         self.use_service_account = use_service_account
         self.creds = self._get_credentials()
         self.client = gspread.authorize(self.creds)
-        self.sheet = self.client.open_by_key(settings.google_sheets_id).sheet1
+        self.spreadsheet = self.client.open_by_key(settings.google_sheets_id)
+
+        # Default to reading from all year worksheets
+        # Note: "2025 " has a trailing space in the actual sheet
+        self.worksheet_names = worksheets or ["2023", "2024", "2025"]
+
+        # For backward compatibility
+        self.sheet = self.spreadsheet.sheet1
 
     def _get_credentials(self):
         """
@@ -105,14 +113,46 @@ class SheetsClient:
 
     def get_all_books(self) -> List[Book]:
         """
-        Load all books from Google Sheets.
+        Load all books from multiple Google Sheets worksheets.
+        Reads from worksheets specified in __init__ (default: 2023, 2024, 2025).
+
+        Returns:
+            List of Book objects from all worksheets combined
+        """
+        all_books = []
+
+        for worksheet_name in self.worksheet_names:
+            try:
+                print(f"Loading from worksheet: {worksheet_name}")
+                worksheet = self.spreadsheet.worksheet(worksheet_name)
+                records = worksheet.get_all_records()
+
+                books_from_sheet = self._parse_books_from_records(records, worksheet_name)
+                all_books.extend(books_from_sheet)
+
+                print(f"✓ Loaded {len(books_from_sheet)} books from {worksheet_name}")
+
+            except gspread.WorksheetNotFound:
+                print(f"⚠️  Worksheet '{worksheet_name}' not found, skipping...")
+                continue
+            except Exception as e:
+                print(f"Error loading from worksheet '{worksheet_name}': {e}")
+                continue
+
+        print(f"\nTotal books loaded: {len(all_books)}")
+        return all_books
+
+    def _parse_books_from_records(self, records: List[dict], source_sheet: str = "") -> List[Book]:
+        """
+        Parse Book objects from sheet records.
+
+        Args:
+            records: List of dictionaries from get_all_records()
+            source_sheet: Name of the source worksheet (for debugging)
 
         Returns:
             List of Book objects
         """
-        # Get all records as list of dicts
-        records = self.sheet.get_all_records()
-
         books = []
         for record in records:
             try:
@@ -142,7 +182,7 @@ class SheetsClient:
                 )
                 books.append(book)
             except Exception as e:
-                print(f"Error parsing book: {record.get('Book Title', 'Unknown')}: {e}")
+                print(f"Error parsing book from {source_sheet}: {record.get('Book Title', 'Unknown')}: {e}")
                 continue
 
         return books
