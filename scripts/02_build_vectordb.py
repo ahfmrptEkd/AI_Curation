@@ -7,11 +7,6 @@ import sys
 from pathlib import Path
 
 # Add project root to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
-from dotenv import load_dotenv
-load_dotenv(override=True)
 
 from src.data.sheets_client import SheetsClient
 from src.vectordb.chroma_manager import ChromaManager
