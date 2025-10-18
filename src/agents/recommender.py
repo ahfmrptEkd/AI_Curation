@@ -207,7 +207,10 @@ Output: VALID|swoony sports romance with athletic heroes and romantic tension
         formatted_books = []
         for i, rec in enumerate(recommendations, 1):
             metadata = rec["metadata"]
-            description = rec.get("description", "No description available")
+            description = rec.get("description") or "No description available"
+
+            # Safely truncate description
+            desc_preview = description[:300] if len(description) > 300 else description
 
             book_info = f"""
 Book {i}: {metadata.get('title')} by {metadata.get('author')}
@@ -215,7 +218,7 @@ Trope: {metadata.get('trope', 'N/A')}
 Rating: {metadata.get('rating', 'N/A')}⭐
 Tags: {metadata.get('tags', 'N/A')}
 Similarity Score: {rec['score']:.3f}
-Description: {description[:300]}...
+Description: {desc_preview}
 """
             formatted_books.append(book_info.strip())
 
