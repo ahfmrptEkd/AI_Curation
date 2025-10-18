@@ -116,22 +116,28 @@ class SheetsClient:
         books = []
         for record in records:
             try:
-                # Map actual sheet columns to Book model
-                # Sheet columns: "Book Title", "Author", "Rating", "Type", "Summary/Notes"
+                author = record.get('Author', '')
+                if not author or not isinstance(author, str):
+                    continue
+
+                title = record.get('Book Title', '').strip()
+                if not title:
+                    continue
 
                 # Parse rating (handle emoji stars: ⭐⭐⭐ -> 3.0)
                 rating_str = str(record.get('Rating', ''))
                 if '⭐' in rating_str:
                     rating = float(rating_str.count('⭐'))
                 else:
-                    rating = float(rating_str) if rating_str else 3.0
+                    rating = float(rating_str) if rating_str and rating_str != '' else 3.0
 
                 book = Book(
-                    title=record.get('Book Title', ''),
-                    author=record.get('Author', ''),
+                    title=title,
+                    author=author.strip(),
                     rating=rating,
                     review=record.get('Summary/Notes', ''),
-                    category=record.get('Type', ''),
+                    trope=record.get('Trope', '').strip(),
+                    category="Romance",  # Default for first user
                     tags=record.get('Tags', '')  # Tags might be empty or not exist yet
                 )
                 books.append(book)

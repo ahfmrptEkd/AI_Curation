@@ -14,12 +14,15 @@ class Book(BaseModel):
     author: str = Field(..., description="Book author")
     rating: float = Field(..., ge=1.0, le=5.0, description="Rating from 1 to 5")
     review: str = Field(..., description="User review text")
-    category: str = Field(..., description="Book category/genre")
-    tags: Optional[List[str]] = Field(default=None, description="Emotion tags (AI-generated)")
+    trope: str = Field(default="", description="Romance subgenre/trope (e.g., Friends to Lovers)")
 
-    # Optional fields from external APIs
-    description: Optional[str] = Field(default=None, description="Book description from external API")
-    cover_url: Optional[str] = Field(default=None, description="Cover image URL")
+    # Default category (all books are Romance for first user)
+    category: str = Field(default="Romance", description="Book category/genre")
+
+    # AI-generated and API fields
+    tags: Optional[List[str]] = Field(default=None, description="Emotion tags (AI-generated)")
+    description: Optional[str] = Field(default=None, description="Book description from Google Books API")
+    cover_url: Optional[str] = Field(default=None, description="Cover image URL from Google Books API")
     isbn: Optional[str] = Field(default=None, description="ISBN number")
 
     @field_validator('tags', mode='before')
@@ -55,12 +58,14 @@ class Book(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "title": "달러구트 꿈 백화점",
-                "author": "이미예",
-                "rating": 4.5,
-                "review": "따뜻하고 힐링되는 내용이었다. 읽는 내내 미소가 지어졌다.",
-                "category": "소설",
-                "tags": ["#힐링되는", "#따뜻한"]
+                "title": "Too Much",
+                "author": "I.A. Dice",
+                "rating": 3.0,
+                "review": "Unhinged. Oh my freaking god unhinged. Literally, things just kept happening...",
+                "trope": "Friends to Lovers",
+                "category": "Romance",
+                "tags": ["#suspense", "#comedy"],
+                "description": "A fresh start in Newport Beach leads to an unexpected romance..."
             }
         }
 
