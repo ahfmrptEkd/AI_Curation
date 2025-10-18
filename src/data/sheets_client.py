@@ -1,10 +1,11 @@
 """
 Google Sheets client for reading and updating book data.
-Uses OAuth2 credentials for authentication.
+Supports both OAuth2 (for local development) and Service Account (for production).
 """
 
 import gspread
 from google.oauth2.credentials import Credentials
+from google.oauth2.service_account import Credentials as ServiceAccountCredentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from typing import List, Optional
@@ -25,13 +26,53 @@ SCOPES = [
 class SheetsClient:
     """Client for interacting with Google Sheets."""
 
-    def __init__(self):
-        """Initialize gspread client with OAuth2 credentials."""
+    def __init__(self, use_service_account: bool = True):
+        """
+        Initialize gspread client with credentials.
+
+        Args:
+            use_service_account: If True, use Service Account authentication (recommended for production).
+                                If False, use OAuth2 flow (requires browser).
+        """
+        self.use_service_account = use_service_account
         self.creds = self._get_credentials()
         self.client = gspread.authorize(self.creds)
         self.sheet = self.client.open_by_key(settings.google_sheets_id).sheet1
 
-    def _get_credentials(self) -> Credentials:
+    def _get_credentials(self):
+        """
+        Get credentials based on authentication method.
+        Service Account is preferred for web/production environments.
+        """
+        if self.use_service_account:
+            return self._get_service_account_credentials()
+        else:
+            return self._get_oauth_credentials()
+
+    def _get_service_account_credentials(self) -> ServiceAccountCredentials:
+        """
+        Get Service Account credentials.
+        This method doesn't require browser authentication.
+
+        To use this:
+        1. Create a Service Account in Google Cloud Console
+        2. Download the JSON key file
+        3. Share your Google Sheet with the service account email
+        """
+        try:
+            creds = ServiceAccountCredentials.from_service_account_file(
+                settings.google_credentials_path,
+                scopes=SCOPES
+            )
+            return creds
+        except Exception as e:
+            print(f"Service Account authentication failed: {e}")
+            print("Make sure:")
+            print("1. credentials.json is a Service Account key file")
+            print("2. The Service Account email has access to your Google Sheet")
+            raise
+
+    def _get_oauth_credentials(self) -> Credentials:
         """
         Get valid user credentials from storage or initiate OAuth2 flow.
         The token is stored in token.pickle for reuse.
