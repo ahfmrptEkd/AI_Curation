@@ -11,13 +11,14 @@ from src.data.models import Book
 
 
 class TagGenerator:
-    """Generate emotion tags for Korean book reviews using LLM."""
+    """Generate emotion tags for book reviews using LLM."""
 
-    # Available emotion tags
+    # Available emotion tags (English for Romance books)
     AVAILABLE_TAGS = [
-        "#힐링되는", "#긴장감넘치는", "#생각이많아지는", "#따뜻한", "#슬픈",
-        "#유쾌한", "#무거운", "#가벼운", "#감동적인", "#현실적인", "#판타지적인",
-        "#교훈적인", "#위로받는", "#설레는", "#우울한", "#희망적인"
+        "#healing", "#suspenseful", "#thought-provoking", "#heartwarming", "#sad",
+        "#fun", "#heavy", "#light", "#touching", "#realistic", "#fantastical",
+        "#inspiring", "#comforting", "#exciting", "#dark", "#hopeful",
+        "#emotional", "#steamy", "#angsty", "#swoony"
     ]
 
     def __init__(self):
@@ -28,34 +29,30 @@ class TagGenerator:
             api_key=settings.openai_api_key
         )
 
-        # System prompt with Korean cultural context
-        self.system_prompt = """You are a Korean book review emotion analyzer.
+        # System prompt for English romance book reviews
+        self.system_prompt = """You are a book review emotion analyzer specializing in Romance novels.
 
-Analyze reviews and extract 1-3 core emotion hashtags.
-
-Cultural context:
-- Korean reviews use indirect expressions: '괜찮았어요' = very good
-- Physical reactions indicate deep emotions: '눈물이 났어요' = deeply moved
-- '소름돋았어요' = intense impression
-- '마음이 따뜻해졌어요' = heartwarming
+Analyze reviews and extract 1-3 core emotion hashtags that capture the reader's emotional experience.
 
 Available tags (choose from these only):
-#힐링되는 #긴장감넘치는 #생각이많아지는 #따뜻한 #슬픈
-#유쾌한 #무거운 #가벼운 #감동적인 #현실적인 #판타지적인
-#교훈적인 #위로받는 #설레는 #우울한 #희망적인
+#healing #suspenseful #thought-provoking #heartwarming #sad
+#fun #heavy #light #touching #realistic #fantastical
+#inspiring #comforting #exciting #dark #hopeful
+#emotional #steamy #angsty #swoony
 
 Rules:
 1. Extract 1-3 tags that best capture the emotional tone
-2. Prioritize explicit emotional words in the review
+2. Prioritize explicit emotional words and reactions in the review
 3. Consider the rating (5.0 = very positive emotions, 1.0 = negative emotions)
-4. Output format: #tag1,#tag2,#tag3 (comma-separated, no spaces)
-5. ONLY use tags from the available list above
+4. Pay attention to romance-specific emotions (swoony, angsty, steamy)
+5. Output format: #tag1,#tag2,#tag3 (comma-separated, no spaces)
+6. ONLY use tags from the available list above
 
 Examples:
-- "따뜻하고 힐링되는 내용이었다. 읽는 내내 미소가 지어졌다." → #힐링되는,#따뜻한
-- "긴장감 넘치고 소름돋는 전개였다." → #긴장감넘치는,#무거운
-- "눈물이 났다. 감동적인 스토리." → #감동적인,#슬픈
-- "가볍게 읽기 좋았다. 재미있었다." → #가벼운,#유쾌한"""
+- "Unhinged. So fun. Things just kept happening." → #fun,#exciting
+- "Honestly, I dislike Logan. He keeps treating her like shit." → #angsty,#dark
+- "Sweet, spicy and just the right amount of slowburn." → #swoony,#steamy,#heartwarming
+- "Loved it. This book was great." → #touching,#hopeful"""
 
         self.prompt_template = ChatPromptTemplate.from_messages([
             ("system", self.system_prompt),
@@ -66,24 +63,50 @@ Review: {review}
 Extract emotion tags:""")
         ])
 
-    def generate_tags(self, title: str, rating: float, review: str) -> List[str]:
+    def generate_tags(
+        self,
+        title: str,
+        rating: float = None,
+        review: str = None,
+        description: str = None
+    ) -> List[str]:
         """
-        Generate emotion tags for a book review.
+        Generate emotion tags for a book based on review or description.
 
         Args:
             title: Book title
-            rating: Rating from 1 to 5
-            review: Korean review text
+            rating: Rating from 1 to 5 (optional for new books)
+            review: User review text (for books already read)
+            description: Book description from Google Books API (for new books)
 
         Returns:
             List of emotion hashtags (1-3 tags)
+
+        Note:
+            Priority: review > description
+            - Use review for books the user has read (captures actual emotional response)
+            - Use description for new/recommended books (captures book's tone/mood)
         """
         try:
+            # Determine which text to use (priority: description > review)
+            if description:
+                text = description
+                source = "description"
+            elif review:
+                text = review
+                source = "review"
+            else:
+                print(f"Warning: No review or description provided for '{title}'")
+                return ["#thought-provoking"]  # Default fallback
+
+            # Use rating if provided, otherwise default to neutral
+            rating_value = rating if rating else 0.0
+
             # Create the prompt
             prompt = self.prompt_template.format_messages(
                 title=title,
-                rating=rating,
-                review=review
+                rating=rating_value,
+                review=text
             )
 
             # Get LLM response
@@ -143,7 +166,7 @@ Extract emotion tags:""")
         # Ensure we have at least 1 tag
         if not valid_tags:
             print("Warning: No valid tags generated, using default")
-            valid_tags = ["#생각이많아지는"]  # Default fallback
+            valid_tags = ["#thought-provoking"]  # Default fallback
 
         # Limit to 3 tags
         return valid_tags[:3]
@@ -189,7 +212,7 @@ Extract emotion tags:""")
                     print(f"✓ {book.title}: {', '.join(valid_tags)}")
                 except Exception as e:
                     print(f"✗ Error processing '{book.title}': {e}")
-                    results[book.title] = ["#생각이많아지는"]  # Fallback
+                    results[book.title] = ["#thought-provoking"]  # Fallback
 
             return results
 
@@ -212,39 +235,58 @@ if __name__ == "__main__":
 
     generator = TagGenerator()
 
-    # Test cases
-    test_cases = [
+    print("📚 Test 1: User Review-based Tags (Books already read)\n")
+
+    # Test cases with user reviews
+    review_tests = [
         {
-            "title": "달러구트 꿈 백화점",
-            "rating": 4.5,
-            "review": "따뜻하고 힐링되는 내용이었다. 읽는 내내 미소가 지어졌다."
+            "title": "Too Much",
+            "rating": 3.0,
+            "review": "Unhinged. Oh my freaking god unhinged. Literally, things just kept happening and I was like wtf the whole time. so fun."
         },
         {
-            "title": "1984",
-            "rating": 4.6,
-            "review": "소름돋는 디스토피아. 현실과 겹쳐보이는 부분이 무섭다."
-        },
-        {
-            "title": "나미야 잡화점의 기적",
-            "rating": 5.0,
-            "review": "눈물이 났다. 시간을 넘나드는 편지가 주는 감동이 대단했다."
-        },
-        {
-            "title": "미드나잇 라이브러리",
-            "rating": 4.8,
-            "review": "삶의 선택에 대해 깊이 생각하게 되었다. 우울했던 마음이 위로받았다."
+            "title": "Too Sweet",
+            "rating": 3.0,
+            "review": "This fic is sweet, spicy and just the right amount of slowburn. There is no third act break up (Hallelujah!)."
         }
     ]
 
-    for i, test in enumerate(test_cases, 1):
+    for i, test in enumerate(review_tests, 1):
         print(f"Test {i}: {test['title']}")
         print(f"Rating: {test['rating']}/5")
-        print(f"Review: {test['review']}")
+        print(f"Review: {test['review'][:60]}...")
 
         tags = generator.generate_tags(
             title=test['title'],
             rating=test['rating'],
             review=test['review']
+        )
+
+        print(f"Generated tags: {', '.join(tags)}")
+        print("-" * 60)
+        print()
+
+    print("\n📖 Test 2: Description-based Tags (New/Recommended books)\n")
+
+    # Test cases with book descriptions (simulating Google Books API)
+    description_tests = [
+        {
+            "title": "The Love Hypothesis",
+            "description": "A contemporary romantic comedy about a fake dating experiment between a PhD student and a grumpy professor. Witty banter, slow-burn chemistry, and STEM representation make this a delightful enemies-to-lovers romance."
+        },
+        {
+            "title": "Beach Read",
+            "description": "Two writers with opposing worldviews challenge each other to write in the other's genre while spending a summer as neighbors. A heartfelt exploration of grief, hope, and second chances wrapped in humor and romance."
+        }
+    ]
+
+    for i, test in enumerate(description_tests, 1):
+        print(f"Test {i}: {test['title']}")
+        print(f"Description: {test['description'][:80]}...")
+
+        tags = generator.generate_tags(
+            title=test['title'],
+            description=test['description']
         )
 
         print(f"Generated tags: {', '.join(tags)}")

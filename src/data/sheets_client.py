@@ -1,10 +1,11 @@
 """
 Google Sheets client for reading and updating book data.
-Uses OAuth2 credentials for authentication.
+Supports both OAuth2 (for local development) and Service Account (for production).
 """
 
 import gspread
 from google.oauth2.credentials import Credentials
+from google.oauth2.service_account import Credentials as ServiceAccountCredentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from typing import List, Optional
@@ -25,13 +26,53 @@ SCOPES = [
 class SheetsClient:
     """Client for interacting with Google Sheets."""
 
-    def __init__(self):
-        """Initialize gspread client with OAuth2 credentials."""
+    def __init__(self, use_service_account: bool = True):
+        """
+        Initialize gspread client with credentials.
+
+        Args:
+            use_service_account: If True, use Service Account authentication (recommended for production).
+                                If False, use OAuth2 flow (requires browser).
+        """
+        self.use_service_account = use_service_account
         self.creds = self._get_credentials()
         self.client = gspread.authorize(self.creds)
         self.sheet = self.client.open_by_key(settings.google_sheets_id).sheet1
 
-    def _get_credentials(self) -> Credentials:
+    def _get_credentials(self):
+        """
+        Get credentials based on authentication method.
+        Service Account is preferred for web/production environments.
+        """
+        if self.use_service_account:
+            return self._get_service_account_credentials()
+        else:
+            return self._get_oauth_credentials()
+
+    def _get_service_account_credentials(self) -> ServiceAccountCredentials:
+        """
+        Get Service Account credentials.
+        This method doesn't require browser authentication.
+
+        To use this:
+        1. Create a Service Account in Google Cloud Console
+        2. Download the JSON key file
+        3. Share your Google Sheet with the service account email
+        """
+        try:
+            creds = ServiceAccountCredentials.from_service_account_file(
+                settings.google_credentials_path,
+                scopes=SCOPES
+            )
+            return creds
+        except Exception as e:
+            print(f"Service Account authentication failed: {e}")
+            print("Make sure:")
+            print("1. credentials.json is a Service Account key file")
+            print("2. The Service Account email has access to your Google Sheet")
+            raise
+
+    def _get_oauth_credentials(self) -> Credentials:
         """
         Get valid user credentials from storage or initiate OAuth2 flow.
         The token is stored in token.pickle for reuse.
@@ -75,18 +116,33 @@ class SheetsClient:
         books = []
         for record in records:
             try:
-                # Map sheet columns to Book model
+                author = record.get('Author', '')
+                if not author or not isinstance(author, str):
+                    continue
+
+                title = record.get('Book Title', '').strip()
+                if not title:
+                    continue
+
+                # Parse rating (handle emoji stars: ⭐⭐⭐ -> 3.0)
+                rating_str = str(record.get('Rating', ''))
+                if '⭐' in rating_str:
+                    rating = float(rating_str.count('⭐'))
+                else:
+                    rating = float(rating_str) if rating_str and rating_str != '' else 3.0
+
                 book = Book(
-                    title=record['Title'],
-                    author=record['Author'],
-                    rating=record['Rating'],
-                    review=record['Review'],
-                    category=record['Category'],
-                    tags=record.get('Tags', '')  # Tags might be empty
+                    title=title,
+                    author=author.strip(),
+                    rating=rating,
+                    review=record.get('Summary/Notes', ''),
+                    trope=record.get('Trope', '').strip(),
+                    category="Romance",  # Default for first user
+                    tags=record.get('Tags', '')  # Tags might be empty or not exist yet
                 )
                 books.append(book)
             except Exception as e:
-                print(f"Error parsing book: {record.get('Title', 'Unknown')}: {e}")
+                print(f"Error parsing book: {record.get('Book Title', 'Unknown')}: {e}")
                 continue
 
         return books
@@ -119,14 +175,22 @@ class SheetsClient:
             True if successful, False otherwise
         """
         try:
-            # Find the row with matching title
+            # Find the row with matching title (search in "Book Title" column)
             cell = self.sheet.find(title)
             if not cell:
                 print(f"Book not found: {title}")
                 return False
 
-            # Get Tags column index (assumed to be column F, index 6)
-            tags_col = 6
+            # Find Tags column index dynamically
+            headers = self.sheet.row_values(1)
+            if 'Tags' in headers:
+                tags_col = headers.index('Tags') + 1  # 1-indexed
+            else:
+                # If Tags column doesn't exist, add it
+                tags_col = len(headers) + 1
+                self.sheet.update_cell(1, tags_col, 'Tags')
+                print(f"Added 'Tags' column at position {tags_col}")
+
             tags_string = ",".join(tags)
 
             # Update the tags cell
