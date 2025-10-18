@@ -3,11 +3,6 @@ Build vector database from Google Sheets books.
 Embeds all books and stores them in ChromaDB for semantic search.
 """
 
-import sys
-from pathlib import Path
-
-# Add project root to path
-
 from src.data.sheets_client import SheetsClient
 from src.vectordb.chroma_manager import ChromaManager
 
