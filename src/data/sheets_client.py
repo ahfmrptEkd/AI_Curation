@@ -116,18 +116,27 @@ class SheetsClient:
         books = []
         for record in records:
             try:
-                # Map sheet columns to Book model
+                # Map actual sheet columns to Book model
+                # Sheet columns: "Book Title", "Author", "Rating", "Type", "Summary/Notes"
+
+                # Parse rating (handle emoji stars: ⭐⭐⭐ -> 3.0)
+                rating_str = str(record.get('Rating', ''))
+                if '⭐' in rating_str:
+                    rating = float(rating_str.count('⭐'))
+                else:
+                    rating = float(rating_str) if rating_str else 3.0
+
                 book = Book(
-                    title=record['Title'],
-                    author=record['Author'],
-                    rating=record['Rating'],
-                    review=record['Review'],
-                    category=record['Category'],
-                    tags=record.get('Tags', '')  # Tags might be empty
+                    title=record.get('Book Title', ''),
+                    author=record.get('Author', ''),
+                    rating=rating,
+                    review=record.get('Summary/Notes', ''),
+                    category=record.get('Type', ''),
+                    tags=record.get('Tags', '')  # Tags might be empty or not exist yet
                 )
                 books.append(book)
             except Exception as e:
-                print(f"Error parsing book: {record.get('Title', 'Unknown')}: {e}")
+                print(f"Error parsing book: {record.get('Book Title', 'Unknown')}: {e}")
                 continue
 
         return books
@@ -160,14 +169,22 @@ class SheetsClient:
             True if successful, False otherwise
         """
         try:
-            # Find the row with matching title
+            # Find the row with matching title (search in "Book Title" column)
             cell = self.sheet.find(title)
             if not cell:
                 print(f"Book not found: {title}")
                 return False
 
-            # Get Tags column index (assumed to be column F, index 6)
-            tags_col = 6
+            # Find Tags column index dynamically
+            headers = self.sheet.row_values(1)
+            if 'Tags' in headers:
+                tags_col = headers.index('Tags') + 1  # 1-indexed
+            else:
+                # If Tags column doesn't exist, add it
+                tags_col = len(headers) + 1
+                self.sheet.update_cell(1, tags_col, 'Tags')
+                print(f"Added 'Tags' column at position {tags_col}")
+
             tags_string = ",".join(tags)
 
             # Update the tags cell
