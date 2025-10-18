@@ -1,0 +1,31 @@
+[project]
+name = "ai-curation"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "chromadb==0.5.20",
+    "fastapi==0.115.5",
+    "google-api-python-client==2.154.0",
+    "google-auth==2.36.0",
+    "google-auth-httplib2==0.2.0",
+    "google-auth-oauthlib==1.2.1",
+    "gspread==6.1.4",
+    "httpx==0.27.2",
+    "langchain==0.3.7",
+    "langchain-community==0.3.5",
+    "langchain-openai==0.2.5",
+    "mcp==1.1.2",
+    "oauth2client==4.1.3",
+    "openai==1.54.4",
+    "pydantic==2.10.1",
+    "pydantic-settings==2.6.1",
+    "pytest==8.3.3",
+    "pytest-asyncio==0.24.0",
+    "python-dotenv==1.0.1",
+    "requests==2.32.3",
+    "rich==13.9.4",
+    "tqdm==4.67.1",
+    "uvicorn==0.32.1",
+]

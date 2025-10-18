@@ -1,0 +1,36 @@
+.python-version
+claude.md
+
+# Environment variables
+*.env
+.env
+
+# Google API credentials (NEVER commit!)
+credentials.json
+token.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# Chroma DB
+data/chroma_db/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tempoary
+sample_books.csv
