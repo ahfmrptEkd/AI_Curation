@@ -21,7 +21,7 @@ sys.path.insert(0, str(project_root))
 from src.data.external_api import BookMetadataFetcher
 from src.data.sheets_client import SheetsClient
 from src.vectordb.chroma_manager import ChromaManager
-from src.data.models import Book
+from src.vectordb.embeddings import EmbeddingManager
 
 
 def main():
@@ -88,56 +88,38 @@ def main():
         return
 
     chroma = ChromaManager()
+    embedding_manager = EmbeddingManager()
 
     # Get current count
     current_count = chroma.collection.count()
     print(f"  Current Vector DB size: {current_count} books")
 
-    # Add books in batches
+    # Add books in batches (directly, no Book model needed)
     batch_size = 20
     added_count = 0
 
     for i in range(0, len(new_books), batch_size):
         batch = new_books[i:i + batch_size]
 
-        # Convert to Book objects (with minimal fields for discovered books)
-        book_objects = []
-        for book_dict in batch:
-            # Create a Book object
-            # Note: Discovered books don't have ratings/reviews/tags
-            book = Book(
-                title=book_dict['title'],
-                author=', '.join(book_dict['authors']) if book_dict['authors'] else 'Unknown',
-                rating=0.0,  # No rating for discovered books
-                review='',   # No review
-                category='Romance',  # All discovered books are Romance
-                tags=[],  # No tags yet
-                description=book_dict['description'],
-                trope=''  # Will be inferred later if needed
-            )
-            book_objects.append(book)
-
-        # Add to ChromaDB with metadata
+        # Prepare documents, metadatas, embeddings, and IDs
         documents = []
         metadatas = []
         ids = []
 
-        for idx, book in enumerate(book_objects):
-            # Document text for embedding (use description since no review)
-            doc_text = f"Title: {book.title}\nAuthor: {book.author}\nDescription: {book.description}"
+        for idx, book_dict in enumerate(batch):
+            # Document text for embedding (use description)
+            author_str = ', '.join(book_dict['authors']) if book_dict['authors'] else 'Unknown'
+            doc_text = f"Title: {book_dict['title']}\nAuthor: {author_str}\nDescription: {book_dict['description']}"
             documents.append(doc_text)
 
-            # Metadata
+            # Metadata (only essential fields, no None values)
             metadata = {
-                'title': book.title,
-                'author': book.author,
-                'category': book.category,
-                'source': 'discovered',  # KEY: Mark as discovered
-                'published': batch[idx]['published'],
-                'isbn_13': batch[idx].get('isbn_13', ''),
-                'isbn_10': batch[idx].get('isbn_10', ''),
-                'search_method': batch[idx]['search_method'],
-                'search_query': batch[idx]['search_query']
+                'title': book_dict['title'],
+                'author': author_str,
+                'category': 'Romance',
+                'source': 'discovered',  # KEY: Distinguish from user-read books
+                'published': book_dict.get('published', '')[:4],  # Just the year
+                'search_method': book_dict['search_method'],
             }
             metadatas.append(metadata)
 
@@ -145,10 +127,14 @@ def main():
             book_id = f"discovered_{added_count + idx}"
             ids.append(book_id)
 
+        # Generate embeddings (one by one using embed_query)
+        embeddings = [embedding_manager.embed_query(doc) for doc in documents]
+
         # Add batch to ChromaDB
         chroma.collection.add(
             documents=documents,
             metadatas=metadatas,
+            embeddings=embeddings,
             ids=ids
         )
 
