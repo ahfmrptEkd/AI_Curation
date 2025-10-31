@@ -178,6 +178,7 @@ class ChromaManager:
             - rating: $gte, $lte, $eq
             - tags: $contains
             - category: exact match
+            - source: exact match (user_read or discovered)
         """
         where = {}
         where_conditions = []
@@ -188,6 +189,9 @@ class ChromaManager:
 
             elif key == "category" and value:
                 where_conditions.append({"category": {"$eq": value}})
+
+            elif key == "source" and value:
+                where_conditions.append({"source": {"$eq": value}})
 
             elif key == "rating" and isinstance(value, dict):
                 # Handle rating comparisons

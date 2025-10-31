@@ -130,14 +130,16 @@ Output: VALID|swoony sports romance with athletic heroes and romantic tension
         """
         Search for candidate books using semantic similarity.
         IMPORTANT: Uses similarity-only (no rating re-ranking) to avoid recommending already-read books.
+        And Only searches 'discovered' books (not user's reading history).
         """
         # Skip if query was marked invalid (candidates would be explicitly set to None or have explanation)
         if state.get("explanation") and not state.get("recommendations"):
             return state
 
         query = state["query"]
-        filters = state.get("filters")
+        filters = state.get("filters") or {}
         n_results = state.get("n_results", 5)
+        filters["source"] = "discovered"
 
         # Search with more candidates than needed for better filtering
         search_results = self.chroma_manager.search(
