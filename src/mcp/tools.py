@@ -166,7 +166,8 @@ class MCPToolHandler:
                 review=review,
                 category=category,
                 tags=tags,
-                trope=category  # Use category as trope for Romance subgenres
+                trope=category,  # Use category as trope for Romance subgenres
+                source="user_read" 
             )
 
             # Step 3: Add to Google Sheets
