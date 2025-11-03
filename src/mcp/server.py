@@ -33,6 +33,7 @@ from src.data.sheets_client import SheetsClient
 from src.vectordb.chroma_manager import ChromaManager
 from src.data.models import Book
 from pathlib import Path
+from datetime import datetime
 
 # Add project root to Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -100,6 +101,90 @@ def recommend_books(
         min_rating=min_rating,
         count=count
     )
+
+
+@mcp.tool()
+def setup_google_sheets(
+    worksheet_name: str = "2025",
+    include_sample_data: bool = True
+) -> dict:
+    """
+    Setup Google Sheets with proper structure for book tracking.
+
+    Creates a new worksheet with all required headers and optional sample data.
+    Use this for NEW users who have a blank Google Sheets or need to add a new year.
+
+    Args:
+        worksheet_name: Name for the worksheet (default: "2025")
+        include_sample_data: Add 2 sample book entries to show format (default: True)
+
+    Returns:
+        Dictionary containing:
+        - success: Whether setup was successful
+        - worksheet_name: Name of created/updated worksheet
+        - spreadsheet_url: Link to the Google Sheets
+        - message: Status message
+
+    Headers created:
+        - Title, Author, Rating, Date, Review, Category, Tags, Trope, ISBN, Notes
+
+    Note:
+        - Requires Google Sheets to be shared with service account
+        - Creates worksheet if it doesn't exist
+        - Won't overwrite existing data if worksheet has headers
+        - Sample data helps understand the expected format
+
+    Examples:
+        >>> setup_google_sheets()  # Create 2025 worksheet with samples
+        >>> setup_google_sheets("2024", include_sample_data=False)  # Just headers
+    """
+    try:
+        print(f"[setup_google_sheets] Setting up worksheet '{worksheet_name}'...")
+
+        sheets_client = SheetsClient()
+
+        # Get spreadsheet info
+        info = sheets_client.get_spreadsheet_info()
+
+        # Setup worksheet
+        success = sheets_client.setup_worksheet(
+            worksheet_name=worksheet_name,
+            include_sample_data=include_sample_data
+        )
+
+        if success:
+            sample_msg = " with 2 sample entries" if include_sample_data else ""
+            return {
+                "success": True,
+                "worksheet_name": worksheet_name,
+                "spreadsheet_title": info.get("title", ""),
+                "spreadsheet_url": info.get("url", ""),
+                "message": f"✅ Worksheet '{worksheet_name}' setup complete{sample_msg}!",
+                "next_steps": [
+                    "Add your books manually to the worksheet, or",
+                    "Use add_book_review() tool to add books via Claude Desktop",
+                    "Once you have 10+ books, run scripts/01_enrich_and_build.py to build Vector DB"
+                ]
+            }
+        else:
+            return {
+                "success": False,
+                "worksheet_name": worksheet_name,
+                "message": f"⚠️  Worksheet '{worksheet_name}' already exists with data",
+                "suggestion": "Use a different worksheet name or check existing data"
+            }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to setup Google Sheets",
+            "troubleshooting": [
+                "Ensure Google Sheets is shared with service account email",
+                "Check GOOGLE_SHEETS_ID in environment variables",
+                "Verify credentials.json is valid"
+            ]
+        }
 
 
 @mcp.tool()
@@ -200,7 +285,6 @@ def check_system_status() -> dict:
             db_file = db_path / "chroma.sqlite3"
             if db_file.exists():
                 mtime = os.path.getmtime(db_file)
-                from datetime import datetime
                 last_modified = datetime.fromtimestamp(mtime)
                 status["last_db_update"] = last_modified.strftime("%Y-%m-%d %H:%M:%S")
 
