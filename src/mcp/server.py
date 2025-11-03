@@ -525,22 +525,30 @@ def sync_from_google_sheets() -> dict:
         updated_books = []
         updated_ids = []
 
+        # Get all Vector DB books for comparison
+        all_db_books = chroma_manager.collection.get(include=['metadatas'])
+        db_book_map = {}  # (title_lower, author_lower) -> (book_id, metadata)
+        for idx, meta in enumerate(all_db_books['metadatas']):
+            title = meta.get('title', '').lower().strip()
+            author = meta.get('author', '').lower().strip()
+            if title and author:
+                db_book_map[(title, author)] = (all_db_books['ids'][idx], meta)
+
+        # Check each Sheets book against Vector DB
         for book in sheets_books:
-            # Generate book ID (same format as used in add_books)
-            book_id = f"{book.title}_{book.author}".lower().replace(" ", "_").replace("'", "")
+            key = (book.title.lower().strip(), book.author.lower().strip())
 
-            # Check if book exists in Vector DB
-            existing_meta = chroma_manager.get_book(book_id)
-
-            if not existing_meta:
+            if key not in db_book_map:
                 # Scenario A: Completely new book
                 book.source = "user_read"
                 new_books.append(book)
-            elif existing_meta.get('source') == 'discovered':
-                # Scenario B: User read a recommended book
-                book.source = "user_read"  # Change from discovered to user_read
-                updated_books.append(book)
-                updated_ids.append(book_id)
+            else:
+                book_id, existing_meta = db_book_map[key]
+                if existing_meta.get('source') == 'discovered':
+                    # Scenario B: User read a recommended book
+                    book.source = "user_read"  # Change from discovered to user_read
+                    updated_books.append(book)
+                    updated_ids.append(book_id)
 
         print(f"  New books to add: {len(new_books)}")
         print(f"  Books to update (discovered→user_read): {len(updated_books)}")
