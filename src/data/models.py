@@ -19,6 +19,12 @@ class Book(BaseModel):
     # Default category (all books are Romance for first user)
     category: str = Field(default="Romance", description="Book category/genre")
 
+    # Source tracking for recommendation filtering
+    source: str = Field(
+        default="user_read",
+        description="Book source: 'user_read' (from reading history) or 'discovered' (from API discovery)"
+    )
+
     # AI-generated and API fields
     tags: Optional[List[str]] = Field(default=None, description="Emotion tags (AI-generated)")
     description: Optional[str] = Field(default=None, description="Book description from Google Books API")
