@@ -278,6 +278,129 @@ class SheetsClient:
         all_books = self.get_all_books()
         return [book for book in all_books if not book.has_tags()]
 
+    def setup_worksheet(self, worksheet_name: str, include_sample_data: bool = False) -> bool:
+        """
+        Setup a new worksheet with proper headers and optional sample data.
+
+        Args:
+            worksheet_name: Name of the worksheet to create (e.g., "2025")
+            include_sample_data: Whether to include sample book entries
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Try to get existing worksheet
+            try:
+                worksheet = self.spreadsheet.worksheet(worksheet_name)
+                print(f"⚠️  Worksheet '{worksheet_name}' already exists")
+
+                # Check if it has headers
+                first_row = worksheet.row_values(1)
+                if first_row:
+                    print(f"   Current headers: {first_row}")
+                    return False
+
+            except:
+                # Worksheet doesn't exist, create it
+                worksheet = self.spreadsheet.add_worksheet(
+                    title=worksheet_name,
+                    rows=100,
+                    cols=10
+                )
+                print(f"✓ Created new worksheet: '{worksheet_name}'")
+
+            # Setup headers
+            headers = [
+                "Title",
+                "Author",
+                "Rating",
+                "Date",
+                "Review",
+                "Category",
+                "Tags",
+                "Trope",
+                "ISBN",
+                "Notes"
+            ]
+
+            worksheet.update('A1:J1', [headers])
+
+            # Format header row (bold, frozen)
+            worksheet.format('A1:J1', {
+                "textFormat": {"bold": True},
+                "backgroundColor": {"red": 0.9, "green": 0.9, "blue": 0.9}
+            })
+            worksheet.freeze(rows=1)
+
+            print(f"✓ Added headers to '{worksheet_name}'")
+
+            # Add sample data if requested
+            if include_sample_data:
+                sample_data = [
+                    [
+                        "Book Lovers",
+                        "Emily Henry",
+                        "4.5",
+                        "2024-01-15",
+                        "A charming romance about two workaholics finding love. Great characters!",
+                        "Romance",
+                        "#heartwarming,#swoony",
+                        "Contemporary Romance",
+                        "",
+                        "Loved the New York setting"
+                    ],
+                    [
+                        "The Love Hypothesis",
+                        "Ali Hazelwood",
+                        "4.0",
+                        "2024-01-20",
+                        "Fake dating with a grumpy professor. STEM representation!",
+                        "Romance",
+                        "#swoony,#fun",
+                        "Contemporary Romance",
+                        "",
+                        "Perfect for STEM nerds"
+                    ]
+                ]
+
+                worksheet.update('A2:J3', sample_data)
+                print(f"✓ Added 2 sample book entries")
+
+            return True
+
+        except Exception as e:
+            print(f"Error setting up worksheet '{worksheet_name}': {e}")
+            return False
+
+    def get_spreadsheet_info(self) -> dict:
+        """
+        Get information about the current spreadsheet.
+
+        Returns:
+            Dictionary with spreadsheet details
+        """
+        try:
+            worksheets = self.spreadsheet.worksheets()
+
+            return {
+                "spreadsheet_id": self.spreadsheet.id,
+                "title": self.spreadsheet.title,
+                "url": self.spreadsheet.url,
+                "worksheets": [
+                    {
+                        "title": ws.title,
+                        "rows": ws.row_count,
+                        "cols": ws.col_count,
+                        "id": ws.id
+                    }
+                    for ws in worksheets
+                ],
+                "total_worksheets": len(worksheets)
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
 
 if __name__ == "__main__":
     # Test Google Sheets connection
