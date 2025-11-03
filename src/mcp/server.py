@@ -32,6 +32,7 @@ from src.data.external_api import BookMetadataFetcher
 from src.data.sheets_client import SheetsClient
 from src.vectordb.chroma_manager import ChromaManager
 from src.data.models import Book
+from pathlib import Path
 
 # Add project root to Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -127,10 +128,6 @@ def check_system_status() -> dict:
     - See when to run book discovery again
     - Verify recommendation pool is fresh
     """
-    from src.vectordb.chroma_manager import ChromaManager
-    from pathlib import Path
-    import os
-
     status = {
         "initialized": False,
         "vector_db_exists": False,
