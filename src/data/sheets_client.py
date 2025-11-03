@@ -268,18 +268,31 @@ class SheetsClient:
             True if successful, False otherwise
         """
         try:
+            current_month = datetime.now().strftime("%B")
 
+            # Get last row to determine next reading order
+            all_values = self.sheet.get_all_values()
+            next_order = len(all_values)  # Header is row 1, so this gives us the next number
+
+            # Convert rating to star emojis (e.g., 4.5 -> "⭐⭐⭐⭐⭐")
+            # Round to nearest integer for star display
+            star_count = round(book.rating)
+            rating_stars = "⭐" * star_count
+
+            # Actual column structure:
+            # 1. Month, 2. #, 3. Book Title, 4. Author, 5. Pages/Word Count/Parts,
+            # 6. Type, 7. Trope, 8. Rating, 9. Spice, 10. Summary/Notes
             row = [
-                book.title,                                    # A: Title
-                book.author,                                   # B: Author
-                book.rating,                                   # C: Rating
-                datetime.now().strftime("%Y-%m-%d"),          # D: Date (auto-fill with today)
-                book.review,                                   # E: Review
-                book.category,                                 # F: Category
-                book.get_tags_string(),                        # G: Tags
-                book.trope if book.trope else "",             # H: Trope
-                book.isbn if book.isbn else "",               # I: ISBN
-                ""                                             # J: Notes (empty)
+                current_month,                                 # A: Month (auto-fill)
+                next_order,                                    # B: # (reading order)
+                book.title,                                    # C: Book Title
+                book.author,                                   # D: Author
+                "",                                            # E: Pages/Word Count/Parts (empty)
+                "Romance",                                     # F: Type (default)
+                book.trope if book.trope else "",             # G: Trope
+                rating_stars,                                  # H: Rating (star emojis)
+                "",                                            # I: Spice (empty)
+                book.review                                    # J: Summary/Notes (유저 리뷰)
             ]
             self.sheet.append_row(row)
             print(f"✓ Added new book: '{book.title}'")
