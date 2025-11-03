@@ -457,6 +457,142 @@ def discover_new_books(
 
 
 @mcp.tool()
+def sync_from_google_sheets() -> dict:
+    """
+    Sync books from Google Sheets to Vector DB.
+
+    This tool handles two scenarios:
+    1. **New books**: Books in Sheets but not in Vector DB
+       → Added with source='user_read'
+
+    2. **Read recommended books**: Books that exist in Vector DB with source='discovered'
+       but now appear in Google Sheets (meaning user read them)
+       → Updated to source='user_read' to exclude from future recommendations
+
+    Use this when:
+    - You added books directly to Google Sheets (not via MCP)
+    - You read a recommended book and added it to Sheets manually
+    - You want to ensure Vector DB reflects your current reading list
+
+    Returns:
+        Dictionary containing:
+        - new_books: Number of completely new books added
+        - updated_books: Number of discovered→user_read updates
+        - total_synced: Total changes made
+        - sample_new: List of 3 sample new book titles
+        - sample_updated: List of 3 sample updated book titles
+        - message: Summary of sync operation
+
+    Examples:
+        >>> sync_from_google_sheets()
+        {
+            "new_books": 5,
+            "updated_books": 2,
+            "total_synced": 7,
+            "sample_new": ["New Book 1", "New Book 2", ...],
+            "sample_updated": ["Beach Read", "Icebreaker"],
+            "message": "✅ Synced 7 books (5 new, 2 updated)"
+        }
+    """
+    from src.agents.tag_generator import TagGenerator
+
+    start_time = time.time()
+
+    results = {
+        "status": "in_progress",
+        "new_books": 0,
+        "updated_books": 0,
+        "total_synced": 0,
+        "sample_new": [],
+        "sample_updated": [],
+        "execution_time": 0
+    }
+
+    try:
+        print("[sync_from_google_sheets] Starting sync...")
+
+        # Step 1: Get all books from Google Sheets
+        print("[1/4] Reading books from Google Sheets...")
+        sheets_client = SheetsClient()
+        sheets_books = sheets_client.get_all_books()
+        print(f"  Found {len(sheets_books)} books in Sheets")
+
+        # Step 2: Check each book against Vector DB
+        print("[2/4] Checking against Vector DB...")
+        chroma_manager = ChromaManager(collection_name="books")
+
+        new_books = []
+        updated_books = []
+        updated_ids = []
+
+        for book in sheets_books:
+            # Generate book ID (same format as used in add_books)
+            book_id = f"{book.title}_{book.author}".lower().replace(" ", "_").replace("'", "")
+
+            # Check if book exists in Vector DB
+            existing_meta = chroma_manager.get_book(book_id)
+
+            if not existing_meta:
+                # Scenario A: Completely new book
+                book.source = "user_read"
+                new_books.append(book)
+            elif existing_meta.get('source') == 'discovered':
+                # Scenario B: User read a recommended book
+                book.source = "user_read"  # Change from discovered to user_read
+                updated_books.append(book)
+                updated_ids.append(book_id)
+
+        print(f"  New books to add: {len(new_books)}")
+        print(f"  Books to update (discovered→user_read): {len(updated_books)}")
+
+        # Step 3: Generate tags for books without them
+        print("[3/4] Generating emotion tags...")
+        tag_generator = TagGenerator()
+
+        books_needing_tags = [b for b in new_books + updated_books if not b.tags]
+        if books_needing_tags:
+            tags_dict = tag_generator.generate_tags_batch(books_needing_tags)
+            for book in books_needing_tags:
+                key = f"{book.title}_{book.author}"
+                if key in tags_dict:
+                    book.tags = tags_dict[key]
+
+        # Step 4: Update Vector DB
+        print("[4/4] Updating Vector DB...")
+
+        # Add new books
+        if new_books:
+            current_count = chroma_manager.count()
+            chroma_manager.add_books(new_books, batch_size=20, start_id=current_count)
+            results["new_books"] = len(new_books)
+            results["sample_new"] = [f"{b.title} by {b.author}" for b in new_books[:3]]
+
+        # Update existing books (discovered → user_read)
+        if updated_books:
+            chroma_manager.update_books(updated_books, updated_ids, batch_size=20)
+            results["updated_books"] = len(updated_books)
+            results["sample_updated"] = [f"{b.title} by {b.author}" for b in updated_books[:3]]
+
+        results["total_synced"] = results["new_books"] + results["updated_books"]
+        results["status"] = "success"
+        results["execution_time"] = round(time.time() - start_time, 2)
+
+        if results["total_synced"] > 0:
+            results["message"] = f"✅ Synced {results['total_synced']} books ({results['new_books']} new, {results['updated_books']} updated)"
+        else:
+            results["message"] = "✅ No changes needed - Vector DB is up to date with Google Sheets"
+
+        return results
+
+    except Exception as e:
+        results["status"] = "error"
+        results["error"] = str(e)
+        results["execution_time"] = round(time.time() - start_time, 2)
+        results["message"] = f"❌ Sync failed: {str(e)}"
+        return results
+
+
+@mcp.tool()
 def add_book_review(
     title: str,
     author: str,
@@ -468,7 +604,7 @@ def add_book_review(
     Add a new book review to the system.
 
     Automatically generates emotion tags using AI and updates both
-    Google Sheets (planned) and Vector Database.
+    Google Sheets and Vector Database.
 
     Args:
         title: Book title (e.g., "Icebreaker")
@@ -516,6 +652,10 @@ if __name__ == "__main__":
     print("Available tools:")
     print("  1. recommend_books - Get personalized recommendations")
     print("  2. add_book_review - Add a new book review")
+    print("  3. sync_from_google_sheets - Sync Sheets to Vector DB")
+    print("  4. check_system_status - Check system health")
+    print("  5. discover_new_books - Find new Romance books")
+    print("  6. setup_google_sheets - Initialize Sheets structure")
     print("\nServer is ready for connections from Claude Desktop.")
     print("="*60 + "\n")
 
