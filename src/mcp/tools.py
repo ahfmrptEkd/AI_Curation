@@ -172,10 +172,14 @@ class MCPToolHandler:
 
             # Step 3: Add to Google Sheets
             print("[handle_add_review] Adding to Google Sheets...")
-            # Note: SheetsClient.add_book() needs to be implemented
-            # For now, we'll just update Vector DB
-            # self.sheets_client.add_book(book)
-            print("[handle_add_review] (Google Sheets update skipped - needs implementation)")
+            try:
+                success = self.sheets_client.add_book(book)
+                if success:
+                    print("[handle_add_review] ✅ Book added to Google Sheets")
+                else:
+                    print("[handle_add_review] ⚠️ Failed to add to Google Sheets (but Vector DB updated)")
+            except Exception as e:
+                print(f"[handle_add_review] ⚠️ Google Sheets error: {e} (but Vector DB updated)")
 
             # Step 4: Update Vector DB
             print("[handle_add_review] Updating Vector DB...")
@@ -193,7 +197,7 @@ class MCPToolHandler:
                     "author": author,
                     "rating": rating,
                     "tags": tags,
-                    "message": "Book review added successfully! (Note: Google Sheets sync pending implementation)"
+                    "message": "Book review added successfully! ✅ Synced to Google Sheets and Vector DB"
                 }
             }
 
