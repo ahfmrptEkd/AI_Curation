@@ -137,8 +137,13 @@ def main():
 
     # Count books with content
     books_with_content = [b for b in books if (b.review and b.review.strip()) or (b.description and b.description.strip())]
+
+    # Set source field for all books from Google Sheets (user's reading history)
+    for book in books_with_content:
+        book.source = "user_read"
+
     print(f"\n{len(books_with_content)} books have content (review or description)")
-    print(f"All {len(books_with_content)} will be added to Vector DB\n")
+    print(f"All {len(books_with_content)} will be added to Vector DB with source='user_read'\n")
 
     response = input("Rebuild Vector DB? (y/n): ")
     if response.lower() != 'y':
