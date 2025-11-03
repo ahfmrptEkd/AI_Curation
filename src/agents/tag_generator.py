@@ -190,10 +190,19 @@ Extract emotion tags:""")
         # Prepare all prompts
         prompts = []
         for book in books:
+            # Determine which text to use (priority: description > review)
+            # Same logic as generate_tags()
+            if book.description:
+                text = book.description
+            elif book.review:
+                text = book.review
+            else:
+                text = "No content available"
+
             prompt = self.prompt_template.format_messages(
                 title=book.title,
-                rating=book.rating,
-                review=book.review
+                rating=book.rating if book.rating else 0.0,
+                review=text  # Use selected text (description or review)
             )
             prompts.append(prompt)
 
