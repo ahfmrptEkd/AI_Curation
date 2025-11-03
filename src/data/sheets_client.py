@@ -11,6 +11,7 @@ from google.auth.transport.requests import Request
 from typing import List, Optional
 import os
 import pickle
+from datetime import datetime
 
 from src.config import settings
 from src.data.models import Book
@@ -26,7 +27,7 @@ SCOPES = [
 class SheetsClient:
     """Client for interacting with Google Sheets."""
 
-    def __init__(self, use_service_account: bool = True, worksheets: Optional[List[str]] = None):
+    def __init__(self, use_service_account: bool = True, worksheets: Optional[List[str]] = None, default_worksheet: Optional[str] = None):
         """
         Initialize gspread client with credentials.
 
@@ -34,6 +35,7 @@ class SheetsClient:
             use_service_account: If True, use Service Account authentication (recommended for production).
                                 If False, use OAuth2 flow (requires browser).
             worksheets: List of worksheet names to read from. If None, reads from ["2023", "2024", "2025"].
+            default_worksheet: Worksheet name for add_book(). If None, auto-detects current year.
         """
         self.use_service_account = use_service_account
         self.creds = self._get_credentials()
@@ -44,8 +46,21 @@ class SheetsClient:
         # Note: "2025 " has a trailing space in the actual sheet
         self.worksheet_names = worksheets or ["2023", "2024", "2025"]
 
-        # For backward compatibility
-        self.sheet = self.spreadsheet.sheet1
+        # For add_book(): Auto-detect current year worksheet
+        if default_worksheet:
+            try:
+                self.sheet = self.spreadsheet.worksheet(default_worksheet)
+            except:
+                self.sheet = self.spreadsheet.sheet1
+        else:
+            # Try to find current year worksheet (2025, 2026, etc.)
+            
+            current_year = str(datetime.now().year)
+            try:
+                self.sheet = self.spreadsheet.worksheet(current_year)
+            except:
+                # Fallback to first sheet if current year not found
+                self.sheet = self.spreadsheet.sheet1
 
     def _get_credentials(self):
         """
@@ -253,13 +268,18 @@ class SheetsClient:
             True if successful, False otherwise
         """
         try:
+
             row = [
-                book.title,
-                book.author,
-                book.rating,
-                book.review,
-                book.category,
-                book.get_tags_string()
+                book.title,                                    # A: Title
+                book.author,                                   # B: Author
+                book.rating,                                   # C: Rating
+                datetime.now().strftime("%Y-%m-%d"),          # D: Date (auto-fill with today)
+                book.review,                                   # E: Review
+                book.category,                                 # F: Category
+                book.get_tags_string(),                        # G: Tags
+                book.trope if book.trope else "",             # H: Trope
+                book.isbn if book.isbn else "",               # I: ISBN
+                ""                                             # J: Notes (empty)
             ]
             self.sheet.append_row(row)
             print(f"✓ Added new book: '{book.title}'")
