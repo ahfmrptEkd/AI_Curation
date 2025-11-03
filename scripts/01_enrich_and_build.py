@@ -160,16 +160,12 @@ def main():
 
     print(f"🔄 Adding {len(books_with_content)} books to Vector DB...")
     print("   (This will take a few minutes...)\n")
-
-    # Add in batches
-    batch_size = 20
-    for i in range(0, len(books_with_content), batch_size):
-        batch = books_with_content[i:i+batch_size]
-        try:
-            chroma_manager.add_books(batch)
-            print(f"✓ Added batch {i//batch_size + 1}: {len(batch)} books (Total: {i+len(batch)})")
-        except Exception as e:
-            print(f"⚠️  Error in batch {i//batch_size + 1}: {e}")
+    
+    try:
+        added_count = chroma_manager.add_books(books_with_content, batch_size=20)
+        print(f"\n✅ Successfully added {added_count} books to Vector DB")
+    except Exception as e:
+        print(f"⚠️  Error adding books: {e}")
 
     # Final summary
     final_count = chroma_manager.count()
