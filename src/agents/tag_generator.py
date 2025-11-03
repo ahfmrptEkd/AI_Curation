@@ -88,13 +88,13 @@ Extract emotion tags:""")
             - Use description for new/recommended books (captures book's tone/mood)
         """
         try:
-            # Determine which text to use (priority: description > review)
-            if description:
-                text = description
-                source = "description"
-            elif review:
+            # Determine which text to use (priority: review > description)
+            if review:
                 text = review
                 source = "review"
+            elif description:
+                text = description
+                source = "description"
             else:
                 print(f"Warning: No review or description provided for '{title}'")
                 return ["#thought-provoking"]  # Default fallback
