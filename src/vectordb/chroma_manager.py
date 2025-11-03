@@ -161,6 +161,7 @@ class ChromaManager:
             "category": book.category,
             "trope": book.trope if book.trope else "",
             "tags": ",".join(book.tags) if book.tags else "",
+            "source": book.source,
         }
 
     def _build_where_clause(self, filters: Dict[str, Any]) -> Dict[str, Any]:
