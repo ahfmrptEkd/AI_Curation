@@ -35,13 +35,14 @@ class ChromaManager:
         # Initialize embedding manager
         self.embedding_manager = EmbeddingManager()
 
-    def add_books(self, books: List[Book], batch_size: int = 50) -> int:
+    def add_books(self, books: List[Book], batch_size: int = 50, start_id: int = 0) -> int:
         """
         Add multiple books to the vector database.
 
         Args:
             books: List of Book objects to add
             batch_size: Number of books to process at once
+            start_id: Starting ID number for books (default: 0)
 
         Returns:
             Number of books successfully added
@@ -50,6 +51,7 @@ class ChromaManager:
             return 0
 
         added_count = 0
+        current_id = start_id
 
         # Process in batches
         for i in range(0, len(books), batch_size):
@@ -58,8 +60,8 @@ class ChromaManager:
             # Generate embeddings
             embeddings = self.embedding_manager.embed_books(batch)
 
-            # Prepare data for Chroma
-            ids = [f"book_{i + j}" for j in range(len(batch))]
+            # Prepare data for Chroma - use global counter for unique IDs
+            ids = [f"book_{current_id + j}" for j in range(len(batch))]
             documents = [self.embedding_manager.book_to_text(book) for book in batch]
             metadatas = [self._book_to_metadata(book) for book in batch]
 
@@ -72,6 +74,7 @@ class ChromaManager:
             )
 
             added_count += len(batch)
+            current_id += len(batch)
             print(f"✓ Added batch {i//batch_size + 1}: {len(batch)} books (Total: {added_count})")
 
         return added_count
