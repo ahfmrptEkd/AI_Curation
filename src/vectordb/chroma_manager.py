@@ -35,6 +35,27 @@ class ChromaManager:
         # Initialize embedding manager
         self.embedding_manager = EmbeddingManager()
 
+    @staticmethod
+    def generate_book_id(book: Book, use_numeric: bool = False, numeric_id: int = 0) -> str:
+        """
+        Generate a consistent book ID.
+
+        Args:
+            book: Book object
+            use_numeric: If True, use numeric format (book_N)
+            numeric_id: Numeric ID to use if use_numeric=True
+
+        Returns:
+            Consistent book ID string
+        """
+        if use_numeric:
+            return f"book_{numeric_id}"
+        else:
+            # Text-based ID from title and author
+            title_clean = book.title.lower().replace(" ", "_").replace("'", "").replace("[", "").replace("]", "")
+            author_clean = book.author.lower().replace(" ", "_").replace("'", "")
+            return f"{title_clean}_{author_clean}"[:100]  # Limit length
+
     def add_books(self, books: List[Book], batch_size: int = 50, start_id: int = 0) -> int:
         """
         Add multiple books to the vector database.
