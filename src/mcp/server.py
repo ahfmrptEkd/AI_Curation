@@ -396,7 +396,7 @@ def discover_new_books(
                 book = Book(
                     title=title,
                     author=author_name,
-                    rating=0.0,
+                    rating=3.0,  # Neutral rating for discovered books (not yet rated by user)
                     review="",
                     category=book_data.get('category', 'Romance'),
                     trope="",
