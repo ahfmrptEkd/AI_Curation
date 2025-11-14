@@ -192,10 +192,10 @@ Extract emotion tags:""")
         for book in books:
             # Determine which text to use (priority: description > review)
             # Same logic as generate_tags()
-            if book.description:
-                text = book.description
-            elif book.review:
+            if book.review:
                 text = book.review
+            elif book.description:
+                text = book.description
             else:
                 text = "No content available"
 
