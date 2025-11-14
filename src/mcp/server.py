@@ -376,48 +376,38 @@ def discover_new_books(
 
         # Author-based search (most reliable)
         if include_authors:
-            popular_authors = [
-                "Emily Henry", "Colleen Hoover", "Ali Hazelwood",
-                "Lucy Score", "Tessa Bailey", "L.J. Shen",
-                "Hannah Grace", "Elle Kennedy", "Penelope Douglas"
-            ]
+            books = api_client.search_romance_books(
+                max_books=max_books
+            )
+            for book_data in books:
+                title = book_data.get('title', '').strip()
+                authors_list = book_data.get('authors', [])
+                author_name = authors_list[0] if authors_list else ''
+                author_name = author_name.strip() if author_name else ''
 
-            for author in popular_authors[:5]:  # Limit to 5 authors for speed
-                books = api_client.search_romance_books(
-                    query=f'inauthor:"{author}"',
-                    max_results=min(max_books // 5, 20)
+                if not author_name:
+                    continue
+
+                key = (title.lower(), author_name.lower())
+                if key in existing_titles:
+                    results["books_skipped"] += 1
+                    continue
+
+                book = Book(
+                    title=title,
+                    author=author_name,
+                    rating=0.0,
+                    review="",
+                    category=book_data.get('category', 'Romance'),
+                    trope="",
+                    source="discovered",
+                    description=book_data.get('description', '')
                 )
-                for book_data in books:
-                    title = book_data.get('title', '').strip()
-                    author_name = book_data.get('author', '').strip()
-
-                    # Check duplicate
-                    key = (title.lower(), author_name.lower())
-                    if key in existing_titles:
-                        results["books_skipped"] += 1
-                        continue
-
-                    # Create Book object
-                    book = Book(
-                        title=title,
-                        author=author_name,
-                        rating=0.0,  # No rating yet
-                        review="",  # No review yet
-                        category=book_data.get('category', 'Romance'),
-                        trope="",
-                        source="discovered",
-                        description=book_data.get('description', '')
-                    )
-                    discovered_books.append(book)
-                    existing_titles.add(key)
-
-                    if len(discovered_books) >= max_books:
-                        break
+                discovered_books.append(book)
+                existing_titles.add(key)
 
                 if len(discovered_books) >= max_books:
                     break
-
-                time.sleep(0.5)  # Rate limiting
 
         results["books_discovered"] = len(discovered_books)
         print(f"  Discovered {len(discovered_books)} new books")
@@ -426,7 +416,6 @@ def discover_new_books(
         if discovered_books:
             print(f"[4/4] Adding {len(discovered_books)} books to Vector DB...")
 
-            # Get current count for proper ID generation
             current_count = chroma_manager.count()
 
             added = chroma_manager.add_books(
@@ -436,7 +425,6 @@ def discover_new_books(
             )
             results["books_added"] = added
 
-            # Sample books for display
             results["sample_books"] = [
                 f"{b.title} by {b.author}"
                 for b in discovered_books[:5]
@@ -561,7 +549,7 @@ def sync_from_google_sheets() -> dict:
         if books_needing_tags:
             tags_dict = tag_generator.generate_tags_batch(books_needing_tags)
             for book in books_needing_tags:
-                key = f"{book.title}_{book.author}"
+                key = book.title
                 if key in tags_dict:
                     book.tags = tags_dict[key]
 
