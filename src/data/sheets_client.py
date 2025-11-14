@@ -272,16 +272,24 @@ class SheetsClient:
 
             # Get last row to determine next reading order
             all_values = self.sheet.get_all_values()
-            next_order = len(all_values)  # Header is row 1, so this gives us the next number
+            last_order = 0
+            for row in all_values[1:]:  # Skip header
+                has_order = len(row) > 1 and row[1]
+                has_title = len(row) > 2 and row[2]
 
-            # Convert rating to star emojis (e.g., 4.5 -> "⭐⭐⭐⭐⭐")
-            # Round to nearest integer for star display
+                if has_order and has_title:
+                    try:
+                        order_num = int(row[1])
+                        if order_num > last_order:
+                            last_order = order_num
+                    except (ValueError, TypeError):
+                        pass
+
+            next_order = last_order + 1
+
             star_count = round(book.rating)
             rating_stars = "⭐" * star_count
 
-            # Actual column structure:
-            # 1. Month, 2. #, 3. Book Title, 4. Author, 5. Pages/Word Count/Parts,
-            # 6. Type, 7. Trope, 8. Rating, 9. Spice, 10. Summary/Notes
             row = [
                 current_month,                                 # A: Month (auto-fill)
                 next_order,                                    # B: # (reading order)
@@ -292,7 +300,7 @@ class SheetsClient:
                 book.trope if book.trope else "",             # G: Trope
                 rating_stars,                                  # H: Rating (star emojis)
                 "",                                            # I: Spice (empty)
-                book.review                                    # J: Summary/Notes (유저 리뷰)
+                book.review                                    # J: Summary/Notes (user review)
             ]
             self.sheet.append_row(row)
             print(f"✓ Added new book: '{book.title}'")
@@ -343,62 +351,254 @@ class SheetsClient:
                 )
                 print(f"✓ Created new worksheet: '{worksheet_name}'")
 
-            # Setup headers
             headers = [
-                "Title",
-                "Author",
-                "Rating",
-                "Date",
-                "Review",
-                "Category",
-                "Tags",
-                "Trope",
-                "ISBN",
-                "Notes"
+                "Month Completed",              # A: Month (auto-filled by add_book)
+                "#",                             # B: Reading order number
+                "Book Title",                    # C: Title
+                "Author",                        # D: Author name
+                "Pages/Word Count/Parts",        # E: Book length (optional)
+                "Type",                          # F: Book type (e.g., Romance)
+                "Trope",                         # G: Romance subgenre/trope
+                "Rating",                        # H: Star rating (⭐⭐⭐)
+                "Spice",                         # I: Spice level (optional)
+                "Summary/Notes"                  # J: Review/notes
             ]
 
             worksheet.update('A1:J1', [headers])
 
-            # Format header row (bold, frozen)
             worksheet.format('A1:J1', {
-                "textFormat": {"bold": True},
-                "backgroundColor": {"red": 0.9, "green": 0.9, "blue": 0.9}
+                "textFormat": {
+                    "bold": True,
+                    "fontSize": 11
+                },
+                "backgroundColor": {"red": 0.9, "green": 0.9, "blue": 0.9},
+                "horizontalAlignment": "CENTER",
+                "verticalAlignment": "MIDDLE"
             })
             worksheet.freeze(rows=1)
 
-            print(f"✓ Added headers to '{worksheet_name}'")
+            rating_rule = {
+                "range": f"H2:H1000",
+                "rule": {
+                    "condition": {
+                        "type": "ONE_OF_LIST",
+                        "values": [
+                            {"userEnteredValue": "⭐"},
+                            {"userEnteredValue": "⭐⭐"},
+                            {"userEnteredValue": "⭐⭐⭐"},
+                            {"userEnteredValue": "⭐⭐⭐⭐"},
+                            {"userEnteredValue": "⭐⭐⭐⭐⭐"}
+                        ]
+                    },
+                    "showCustomUi": True,
+                    "strict": False
+                }
+            }
 
-            # Add sample data if requested
+            trope_rule = {
+                "range": f"G2:G1000",
+                "rule": {
+                    "condition": {
+                        "type": "ONE_OF_LIST",
+                        "values": [
+                            {"userEnteredValue": "Contemporary Romance"},
+                            {"userEnteredValue": "Dark Romance"},
+                            {"userEnteredValue": "Romantasy"},
+                            {"userEnteredValue": "Sports Romance"},
+                            {"userEnteredValue": "Enemies to Lovers"},
+                            {"userEnteredValue": "Friends to Lovers"},
+                            {"userEnteredValue": "Fake Dating"},
+                            {"userEnteredValue": "Forced Proximity"},
+                            {"userEnteredValue": "Second Chance"},
+                            {"userEnteredValue": "GrumpyxSunshine"},
+                            {"userEnteredValue": "Best Friend's Brother"},
+                            {"userEnteredValue": "Brother's Best Friend"},
+                            {"userEnteredValue": "Billionaire"},
+                            {"userEnteredValue": "Mafia Romance"},
+                            {"userEnteredValue": "Single Parent"},
+                            {"userEnteredValue": "Accidental Pregnancy"},
+                            {"userEnteredValue": "Marriage of Convenience"},
+                            {"userEnteredValue": "BDSM"}
+                        ]
+                    },
+                    "showCustomUi": True,
+                    "strict": False
+                }
+            }
+
+            month_rule = {
+                "range": f"A2:A1000",
+                "rule": {
+                    "condition": {
+                        "type": "ONE_OF_LIST",
+                        "values": [
+                            {"userEnteredValue": "January"},
+                            {"userEnteredValue": "February"},
+                            {"userEnteredValue": "March"},
+                            {"userEnteredValue": "April"},
+                            {"userEnteredValue": "May"},
+                            {"userEnteredValue": "June"},
+                            {"userEnteredValue": "July"},
+                            {"userEnteredValue": "August"},
+                            {"userEnteredValue": "September"},
+                            {"userEnteredValue": "October"},
+                            {"userEnteredValue": "November"},
+                            {"userEnteredValue": "December"}
+                        ]
+                    },
+                    "showCustomUi": True,
+                    "strict": False
+                }
+            }
+
+            spice_rule = {
+                "range": f"I2:I1000",
+                "rule": {
+                    "condition": {
+                        "type": "ONE_OF_LIST",
+                        "values": [
+                            {"userEnteredValue": "😇"},
+                            {"userEnteredValue": "💓"},
+                            {"userEnteredValue": "💓💓"},
+                            {"userEnteredValue": "💓💓💓"},
+                            {"userEnteredValue": "💓💓💓💓"},
+                            {"userEnteredValue": "💓💓💓💓💓"}
+                        ]
+                    },
+                    "showCustomUi": True,
+                    "strict": False
+                }
+            }
+
+            requests = [
+                {
+                    "setDataValidation": {
+                        "range": {
+                            "sheetId": worksheet.id,
+                            "startRowIndex": 1,
+                            "endRowIndex": 1000,
+                            "startColumnIndex": 0,
+                            "endColumnIndex": 1
+                        },
+                        "rule": month_rule["rule"]
+                    }
+                },
+                {
+                    "setDataValidation": {
+                        "range": {
+                            "sheetId": worksheet.id,
+                            "startRowIndex": 1,
+                            "endRowIndex": 1000,
+                            "startColumnIndex": 6,
+                            "endColumnIndex": 7
+                        },
+                        "rule": trope_rule["rule"]
+                    }
+                },
+                {
+                    "setDataValidation": {
+                        "range": {
+                            "sheetId": worksheet.id,
+                            "startRowIndex": 1,
+                            "endRowIndex": 1000,
+                            "startColumnIndex": 7,
+                            "endColumnIndex": 8
+                        },
+                        "rule": rating_rule["rule"]
+                    }
+                },
+                {
+                    "setDataValidation": {
+                        "range": {
+                            "sheetId": worksheet.id,
+                            "startRowIndex": 1,
+                            "endRowIndex": 1000,
+                            "startColumnIndex": 8,
+                            "endColumnIndex": 9
+                        },
+                        "rule": spice_rule["rule"]
+                    }
+                }
+            ]
+
+            self.spreadsheet.batch_update({"requests": requests})
+
+            month_colors = {
+                "January": {"red": 0.22, "green": 0.46, "blue": 0.82},    # Blue
+                "February": {"red": 0.82, "green": 0.33, "blue": 0.55},   # Pink
+                "March": {"red": 0.22, "green": 0.73, "blue": 0.41},      # Green
+                "April": {"red": 0.95, "green": 0.80, "blue": 0.19},      # Yellow
+                "May": {"red": 0.95, "green": 0.69, "blue": 0.19},        # Orange-Yellow
+                "June": {"red": 0.40, "green": 0.73, "blue": 0.42},       # Light Green
+                "July": {"red": 0.90, "green": 0.49, "blue": 0.19},       # Orange
+                "August": {"red": 0.85, "green": 0.42, "blue": 0.65},     # Magenta
+                "September": {"red": 0.51, "green": 0.37, "blue": 0.73},  # Purple
+                "October": {"red": 0.90, "green": 0.35, "blue": 0.19},    # Red-Orange
+                "November": {"red": 0.60, "green": 0.44, "blue": 0.29},   # Brown
+                "December": {"red": 0.26, "green": 0.52, "blue": 0.96}    # Light Blue
+            }
+
+            conditional_format_requests = []
+            for month, color in month_colors.items():
+                conditional_format_requests.append({
+                    "addConditionalFormatRule": {
+                        "rule": {
+                            "ranges": [{
+                                "sheetId": worksheet.id,
+                                "startRowIndex": 1,
+                                "endRowIndex": 1000,
+                                "startColumnIndex": 0,
+                                "endColumnIndex": 1
+                            }],
+                            "booleanRule": {
+                                "condition": {
+                                    "type": "TEXT_EQ",
+                                    "values": [{"userEnteredValue": month}]
+                                },
+                                "format": {
+                                    "textFormat": {
+                                        "foregroundColor": color,
+                                        "bold": True
+                                    }
+                                }
+                            }
+                        },
+                        "index": 0
+                    }
+                })
+
+            self.spreadsheet.batch_update({"requests": conditional_format_requests})
+            print(f"✓ Added conditional formatting for 12 months with colors")
+
             if include_sample_data:
                 sample_data = [
                     [
+                        "January",
+                        "1",
                         "Book Lovers",
                         "Emily Henry",
-                        "4.5",
-                        "2024-01-15",
-                        "A charming romance about two workaholics finding love. Great characters!",
+                        "368",
                         "Romance",
-                        "#heartwarming,#swoony",
                         "Contemporary Romance",
+                        "⭐⭐⭐⭐",
                         "",
-                        "Loved the New York setting"
+                        "A charming romance about two workaholics finding love. Great characters! Loved the New York setting"
                     ],
                     [
+                        "January",
+                        "2",
                         "The Love Hypothesis",
                         "Ali Hazelwood",
-                        "4.0",
-                        "2024-01-20",
-                        "Fake dating with a grumpy professor. STEM representation!",
+                        "384",
                         "Romance",
-                        "#swoony,#fun",
-                        "Contemporary Romance",
+                        "Fake Dating",
+                        "⭐⭐⭐⭐",
                         "",
-                        "Perfect for STEM nerds"
+                        "Fake dating with a grumpy professor. STEM representation! Perfect for STEM nerds"
                     ]
                 ]
 
                 worksheet.update('A2:J3', sample_data)
-                print(f"✓ Added 2 sample book entries")
 
             return True
 
