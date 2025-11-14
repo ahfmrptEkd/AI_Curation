@@ -88,13 +88,13 @@ Extract emotion tags:""")
             - Use description for new/recommended books (captures book's tone/mood)
         """
         try:
-            # Determine which text to use (priority: description > review)
-            if description:
-                text = description
-                source = "description"
-            elif review:
+            # Determine which text to use (priority: review > description)
+            if review:
                 text = review
                 source = "review"
+            elif description:
+                text = description
+                source = "description"
             else:
                 print(f"Warning: No review or description provided for '{title}'")
                 return ["#thought-provoking"]  # Default fallback
@@ -190,10 +190,19 @@ Extract emotion tags:""")
         # Prepare all prompts
         prompts = []
         for book in books:
+            # Determine which text to use (priority: description > review)
+            # Same logic as generate_tags()
+            if book.review:
+                text = book.review
+            elif book.description:
+                text = book.description
+            else:
+                text = "No content available"
+
             prompt = self.prompt_template.format_messages(
                 title=book.title,
-                rating=book.rating,
-                review=book.review
+                rating=book.rating if book.rating else 0.0,
+                review=text  # Use selected text (description or review)
             )
             prompts.append(prompt)
 

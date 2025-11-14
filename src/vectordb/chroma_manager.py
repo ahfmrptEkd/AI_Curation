@@ -35,13 +35,35 @@ class ChromaManager:
         # Initialize embedding manager
         self.embedding_manager = EmbeddingManager()
 
-    def add_books(self, books: List[Book], batch_size: int = 50) -> int:
+    @staticmethod
+    def generate_book_id(book: Book, use_numeric: bool = False, numeric_id: int = 0) -> str:
+        """
+        Generate a consistent book ID.
+
+        Args:
+            book: Book object
+            use_numeric: If True, use numeric format (book_N)
+            numeric_id: Numeric ID to use if use_numeric=True
+
+        Returns:
+            Consistent book ID string
+        """
+        if use_numeric:
+            return f"book_{numeric_id}"
+        else:
+            # Text-based ID from title and author
+            title_clean = book.title.lower().replace(" ", "_").replace("'", "").replace("[", "").replace("]", "")
+            author_clean = book.author.lower().replace(" ", "_").replace("'", "")
+            return f"{title_clean}_{author_clean}"[:100]  # Limit length
+
+    def add_books(self, books: List[Book], batch_size: int = 50, start_id: int = 0) -> int:
         """
         Add multiple books to the vector database.
 
         Args:
             books: List of Book objects to add
             batch_size: Number of books to process at once
+            start_id: Starting ID number for books (default: 0)
 
         Returns:
             Number of books successfully added
@@ -50,6 +72,7 @@ class ChromaManager:
             return 0
 
         added_count = 0
+        current_id = start_id
 
         # Process in batches
         for i in range(0, len(books), batch_size):
@@ -58,8 +81,8 @@ class ChromaManager:
             # Generate embeddings
             embeddings = self.embedding_manager.embed_books(batch)
 
-            # Prepare data for Chroma
-            ids = [f"book_{i + j}" for j in range(len(batch))]
+            # Prepare data for Chroma - use global counter for unique IDs
+            ids = [f"book_{current_id + j}" for j in range(len(batch))]
             documents = [self.embedding_manager.book_to_text(book) for book in batch]
             metadatas = [self._book_to_metadata(book) for book in batch]
 
@@ -72,6 +95,7 @@ class ChromaManager:
             )
 
             added_count += len(batch)
+            current_id += len(batch)
             print(f"✓ Added batch {i//batch_size + 1}: {len(batch)} books (Total: {added_count})")
 
         return added_count
@@ -144,6 +168,76 @@ class ChromaManager:
         """Get total number of books in the collection."""
         return self.collection.count()
 
+    def get_book(self, book_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a single book by ID.
+
+        Args:
+            book_id: Unique identifier for the book
+
+        Returns:
+            Book metadata dict if found, None otherwise
+        """
+        try:
+            result = self.collection.get(ids=[book_id], include=["metadatas"])
+            if result and result["ids"]:
+                return result["metadatas"][0]
+            return None
+        except Exception:
+            return None
+
+    def get_all_ids(self) -> List[str]:
+        """
+        Get all book IDs in the collection.
+
+        Returns:
+            List of book IDs
+        """
+        result = self.collection.get(include=[])
+        return result["ids"] if result else []
+
+    def update_books(self, books: List[Book], book_ids: List[str], batch_size: int = 50) -> int:
+        """
+        Update multiple existing books in the vector database.
+
+        Args:
+            books: List of Book objects to update
+            book_ids: Corresponding list of book IDs
+            batch_size: Number of books to process at once
+
+        Returns:
+            Number of books successfully updated
+        """
+        if not books or len(books) != len(book_ids):
+            return 0
+
+        updated_count = 0
+
+        # Process in batches
+        for i in range(0, len(books), batch_size):
+            batch_books = books[i:i + batch_size]
+            batch_ids = book_ids[i:i + batch_size]
+
+            # Generate embeddings
+            embeddings = self.embedding_manager.embed_books(batch_books)
+
+            # Prepare data for Chroma
+            documents = [self.embedding_manager.book_to_text(book) for book in batch_books]
+            metadatas = [self._book_to_metadata(book) for book in batch_books]
+
+            # Update collection
+            self.collection.upsert(
+                ids=batch_ids,
+                embeddings=embeddings,
+                documents=documents,
+                metadatas=metadatas
+            )
+
+            updated_count += len(batch_books)
+            print(f"✓ Updated batch {i//batch_size + 1}: {len(batch_books)} books (Total: {updated_count})")
+
+        return updated_count
+
     def _book_to_metadata(self, book: Book) -> Dict[str, Any]:
         """
         Convert Book object to Chroma metadata.
@@ -161,6 +255,7 @@ class ChromaManager:
             "category": book.category,
             "trope": book.trope if book.trope else "",
             "tags": ",".join(book.tags) if book.tags else "",
+            "source": book.source,
         }
 
     def _build_where_clause(self, filters: Dict[str, Any]) -> Dict[str, Any]:
