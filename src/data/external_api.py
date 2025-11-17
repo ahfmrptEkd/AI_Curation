@@ -222,7 +222,8 @@ class BookMetadataFetcher:
             all_books.extend(author_books)
             print(f"  {author:25s}: {len(author_books):2d} books")
 
-        print(f"\n  Subtotal from authors: {len(all_books)} books")
+        author_subtotal = len(all_books)
+        print(f"\n  Subtotal from authors: {author_subtotal} books")
 
         # STEP 2: Keyword-based search (30%)
         print("\n🔑 STEP 2: Keyword-based search")
@@ -249,7 +250,9 @@ class BookMetadataFetcher:
             all_books.extend(keyword_books)
             print(f"  {keyword:30s}: {len(keyword_books):2d} books")
 
-        print(f"\n  Subtotal from keywords: {len(all_books) - sum(len(self._search_by_author(a, min_year)) for a in authors)} books")
+        # Calculate keyword subtotal without re-querying
+        keyword_subtotal = len(all_books) - author_subtotal
+        print(f"\n  Subtotal from keywords: {keyword_subtotal} books")
 
         # STEP 3: Deduplication
         print("\n🔄 STEP 3: Deduplication")
