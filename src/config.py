@@ -43,14 +43,3 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-if __name__ == "__main__":
-    # Test configuration loading
-    print("=== Configuration Test ===")
-    print(f"OpenAI API Key: {settings.openai_api_key[:20]}...")
-    print(f"Google Sheets ID: {settings.google_sheets_id}")
-    print(f"Credentials Path: {settings.google_credentials_path}")
-    print(f"Chroma DB Path: {settings.chroma_persist_dir}")
-    print(f"Embedding Model: {settings.embedding_model}")
-    print(f"Tag Generation Model: {settings.tag_generation_model}")
-    print(f"Recommendation Model: {settings.recommendation_model}")
-    print("✅ Configuration loaded successfully!")

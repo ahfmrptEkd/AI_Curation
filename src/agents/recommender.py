@@ -298,37 +298,3 @@ Provide a warm, personalized explanation for why these books are great matches. 
         }
 
 
-if __name__ == "__main__":
-    # Test the recommender
-    print("=== Testing Book Recommender ===\n")
-
-    recommender = BookRecommender()
-
-    # Test 1: Valid Romance query
-    print("Test 1: Dark Romance Query")
-    print("-" * 50)
-    result = recommender.recommend(
-        query="dark and intense romance with complex characters",
-        n_results=3
-    )
-
-    print("\nRecommendations:")
-    for i, rec in enumerate(result["recommendations"], 1):
-        meta = rec["metadata"]
-        print(f"\n{i}. {meta['title']} by {meta['author']}")
-        print(f"   Trope: {meta.get('trope', 'N/A')}")
-        print(f"   Score: {rec['score']:.3f}")
-
-    print(f"\nExplanation:\n{result['explanation']}")
-
-    # Test 2: Invalid (non-Romance) query
-    print("\n\n" + "="*50)
-    print("Test 2: Non-Romance Query (should be redirected)")
-    print("-" * 50)
-    result = recommender.recommend(
-        query="science fiction space opera",
-        n_results=3
-    )
-
-    print(f"\nResponse:\n{result['explanation']}")
-    print(f"Recommendations: {len(result['recommendations'])}")

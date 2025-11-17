@@ -638,22 +638,3 @@ def add_book_review(
     )
 
 
-if __name__ == "__main__":
-    # Run the MCP server
-    print("="*60)
-    print("📚 Book Curator MCP Server")
-    print("="*60)
-    print("\nStarting server...")
-    print("This server provides Romance book recommendations via MCP.\n")
-    print("Available tools:")
-    print("  1. recommend_books - Get personalized recommendations")
-    print("  2. add_book_review - Add a new book review")
-    print("  3. sync_from_google_sheets - Sync Sheets to Vector DB")
-    print("  4. check_system_status - Check system health")
-    print("  5. discover_new_books - Find new Romance books")
-    print("  6. setup_google_sheets - Initialize Sheets structure")
-    print("\nServer is ready for connections from Claude Desktop.")
-    print("="*60 + "\n")
-
-    # Start the FastMCP server (stdio mode for Claude Desktop)
-    mcp.run()
