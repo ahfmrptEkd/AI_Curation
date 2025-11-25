@@ -34,3 +34,6 @@ Thumbs.db
 
 # Tempoary
 sample_books.csv
+
+# logs
+logs/
