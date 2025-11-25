@@ -8,6 +8,10 @@ import time
 from typing import Optional, Dict, Any, List
 from urllib.parse import quote
 
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class BookMetadataFetcher:
     """Fetches book metadata from external APIs."""
@@ -60,7 +64,7 @@ class BookMetadataFetcher:
 
             # Check if we got results
             if data.get('totalItems', 0) == 0:
-                print(f"No results found for: {title} by {author}")
+                logger.warning(f"No results found for: {title} by {author}")
                 return None
 
             # Extract first result
@@ -92,10 +96,10 @@ class BookMetadataFetcher:
             return result
 
         except requests.RequestException as e:
-            print(f"Error fetching from Google Books: {e}")
+            logger.error(f"Error fetching from Google Books: {e}")
             return None
         except Exception as e:
-            print(f"Unexpected error: {e}")
+            logger.error(f"Unexpected error: {e}")
             return None
 
     def fetch_open_library_cover(self, isbn: str) -> Optional[str]:
@@ -121,11 +125,11 @@ class BookMetadataFetcher:
             if response.status_code == 200:
                 return url
             else:
-                print(f"Cover not found for ISBN: {isbn}")
+                logger.warning(f"Cover not found for ISBN: {isbn}")
                 return None
 
         except requests.RequestException as e:
-            print(f"Error fetching cover from Open Library: {e}")
+            logger.error(f"Error fetching cover from Open Library: {e}")
             return None
 
     def enrich_book_metadata(self, title: str, author: str) -> Optional[Dict[str, Any]]:
@@ -189,12 +193,12 @@ class BookMetadataFetcher:
         Returns:
             List of book dictionaries with metadata
         """
-        print(f"🔍 Searching for Romance books (published {min_year}+)...")
+        logger.info(f"🔍 Searching for Romance books (published {min_year}+)...")
         all_books = []
 
         # STEP 1: Author-based search (70%)
-        print("\n📚 STEP 1: Author-based search")
-        print("-" * 60)
+        logger.info("\n📚 STEP 1: Author-based search")
+        logger.info("-" * 60)
 
         authors = [
             # Contemporary Romance
@@ -220,14 +224,14 @@ class BookMetadataFetcher:
         for author in authors:
             author_books = self._search_by_author(author, min_year)
             all_books.extend(author_books)
-            print(f"  {author:25s}: {len(author_books):2d} books")
+            logger.info(f"  {author:25s}: {len(author_books):2d} books")
 
         author_subtotal = len(all_books)
-        print(f"\n  Subtotal from authors: {author_subtotal} books")
+        logger.info(f"\n  Subtotal from authors: {author_subtotal} books")
 
         # STEP 2: Keyword-based search (30%)
-        print("\n🔑 STEP 2: Keyword-based search")
-        print("-" * 60)
+        logger.info("\n🔑 STEP 2: Keyword-based search")
+        logger.info("-" * 60)
 
         keywords = [
             # Tropes
@@ -248,24 +252,24 @@ class BookMetadataFetcher:
         for keyword in keywords:
             keyword_books = self._search_by_keyword(keyword, min_year)
             all_books.extend(keyword_books)
-            print(f"  {keyword:30s}: {len(keyword_books):2d} books")
+            logger.info(f"  {keyword:30s}: {len(keyword_books):2d} books")
 
         # Calculate keyword subtotal without re-querying
         keyword_subtotal = len(all_books) - author_subtotal
-        print(f"\n  Subtotal from keywords: {keyword_subtotal} books")
+        logger.info(f"\n  Subtotal from keywords: {keyword_subtotal} books")
 
         # STEP 3: Deduplication
-        print("\n🔄 STEP 3: Deduplication")
-        print("-" * 60)
+        logger.info("\n🔄 STEP 3: Deduplication")
+        logger.info("-" * 60)
         unique_books = self._deduplicate_books(all_books)
-        print(f"  Before: {len(all_books)} books")
-        print(f"  After:  {len(unique_books)} unique books")
+        logger.info(f"  Before: {len(all_books)} books")
+        logger.info(f"  After:  {len(unique_books)} unique books")
 
         # STEP 4: Limit to max_books
         final_books = unique_books[:max_books]
 
-        print(f"\n✅ Final result: {len(final_books)} books")
-        print("=" * 60)
+        logger.info(f"\n✅ Final result: {len(final_books)} books")
+        logger.info("=" * 60)
 
         return final_books
 
@@ -328,7 +332,7 @@ class BookMetadataFetcher:
                 time.sleep(0.3)  # Rate limiting
 
             except Exception as e:
-                print(f"    Error searching {author_name}: {e}")
+                logger.error(f"    Error searching {author_name}: {e}")
                 break
 
         return books
@@ -392,7 +396,7 @@ class BookMetadataFetcher:
                 time.sleep(0.3)
 
             except Exception as e:
-                print(f"    Error searching '{keyword}': {e}")
+                logger.error(f"    Error searching '{keyword}': {e}")
                 break
 
         return books

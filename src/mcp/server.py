@@ -34,6 +34,9 @@ from src.vectordb.chroma_manager import ChromaManager
 from src.data.models import Book
 from pathlib import Path
 from datetime import datetime
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 # Add project root to Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -53,9 +56,9 @@ def get_handler() -> MCPToolHandler:
     """Get or create MCPToolHandler instance (lazy initialization)."""
     global _handler
     if _handler is None:
-        print("[MCP Server] Initializing MCPToolHandler...")
+        logger.info("[MCP Server] Initializing MCPToolHandler...")
         _handler = MCPToolHandler()
-        print("[MCP Server] MCPToolHandler ready!")
+        logger.info("[MCP Server] MCPToolHandler ready!")
     return _handler
 
 
@@ -139,7 +142,7 @@ def setup_google_sheets(
         >>> setup_google_sheets("2024", include_sample_data=False)  # Just headers
     """
     try:
-        print(f"[setup_google_sheets] Setting up worksheet '{worksheet_name}'...")
+        logger.info(f"[setup_google_sheets] Setting up worksheet '{worksheet_name}'...")
 
         sheets_client = SheetsClient()
 
@@ -345,20 +348,20 @@ def discover_new_books(
     }
 
     try:
-        print(f"[discover_new_books] Starting discovery (max: {max_books})...")
+        logger.info(f"[discover_new_books] Starting discovery (max: {max_books})...")
 
         # Step 1: Get existing books to avoid duplicates
-        print("[1/4] Loading existing books from Google Sheets...")
+        logger.info("[1/4] Loading existing books from Google Sheets...")
         sheets_client = SheetsClient()
         existing_books = sheets_client.get_all_books()
         existing_titles = {
             (b.title.lower().strip(), b.author.lower().strip())
             for b in existing_books
         }
-        print(f"  Found {len(existing_books)} existing books to exclude")
+        logger.info(f"  Found {len(existing_books)} existing books to exclude")
 
         # Step 2: Get already discovered books from Vector DB
-        print("[2/4] Checking Vector DB for discovered books...")
+        logger.info("[2/4] Checking Vector DB for discovered books...")
         chroma_manager = ChromaManager(collection_name="books")
         all_db_books = chroma_manager.collection.get(include=['metadatas'])
         for meta in all_db_books['metadatas']:
@@ -367,20 +370,20 @@ def discover_new_books(
                 author = meta.get('author', '').lower().strip()
                 if title and author:
                     existing_titles.add((title, author))
-        print(f"  Total books to exclude: {len(existing_titles)}")
+        logger.info(f"  Total books to exclude: {len(existing_titles)}")
 
         # Step 3: Discover new books from Google Books API
-        print("[3/4] Discovering new books from Google Books API...")
+        logger.info("[3/4] Discovering new books from Google Books API...")
         api_client = BookMetadataFetcher()
         discovered_books = []
 
         if include_authors and include_keywords:
             # Full hybrid search (authors + keywords)
-            print("  Using hybrid search (authors + keywords)...")
+            logger.info("  Using hybrid search (authors + keywords)...")
             books = api_client.search_romance_books(max_books=max_books)
         elif include_authors:
             # Author-only search (default, most reliable)
-            print("  Using author-based search only...")
+            logger.info("  Using author-based search only...")
             books = []
             authors = [
                 'Emily Henry', 'Colleen Hoover', 'Ali Hazelwood',
@@ -401,7 +404,7 @@ def discover_new_books(
             books = api_client._deduplicate_books(books[:max_books])
         elif include_keywords:
             # Keyword-only search (for diversity)
-            print("  Using keyword-based search only...")
+            logger.info("  Using keyword-based search only...")
             books = []
             keywords = [
                 'enemies to lovers romance',
@@ -422,7 +425,7 @@ def discover_new_books(
                     break
             books = api_client._deduplicate_books(books[:max_books])
         else:
-            print("  Warning: Both include_authors and include_keywords are False. No books will be discovered.")
+            logger.warning("  Warning: Both include_authors and include_keywords are False. No books will be discovered.")
             books = []
 
         for book_data in books:
@@ -456,11 +459,11 @@ def discover_new_books(
                 break
 
         results["books_discovered"] = len(discovered_books)
-        print(f"  Discovered {len(discovered_books)} new books")
+        logger.info(f"  Discovered {len(discovered_books)} new books")
 
         # Step 4: Add to Vector DB
         if discovered_books:
-            print(f"[4/4] Adding {len(discovered_books)} books to Vector DB...")
+            logger.info(f"[4/4] Adding {len(discovered_books)} books to Vector DB...")
 
             current_count = chroma_manager.count()
 
@@ -476,7 +479,7 @@ def discover_new_books(
                 for b in discovered_books[:5]
             ]
         else:
-            print("[4/4] No new books to add")
+            logger.info("[4/4] No new books to add")
 
         results["status"] = "success"
         results["execution_time"] = round(time.time() - start_time, 2)
@@ -543,16 +546,16 @@ def sync_from_google_sheets() -> dict:
     }
 
     try:
-        print("[sync_from_google_sheets] Starting sync...")
+        logger.info("[sync_from_google_sheets] Starting sync...")
 
         # Step 1: Get all books from Google Sheets
-        print("[1/4] Reading books from Google Sheets...")
+        logger.info("[1/4] Reading books from Google Sheets...")
         sheets_client = SheetsClient()
         sheets_books = sheets_client.get_all_books()
-        print(f"  Found {len(sheets_books)} books in Sheets")
+        logger.info(f"  Found {len(sheets_books)} books in Sheets")
 
         # Step 2: Check each book against Vector DB
-        print("[2/4] Checking against Vector DB...")
+        logger.info("[2/4] Checking against Vector DB...")
         chroma_manager = ChromaManager(collection_name="books")
 
         new_books = []
@@ -584,11 +587,11 @@ def sync_from_google_sheets() -> dict:
                     updated_books.append(book)
                     updated_ids.append(book_id)
 
-        print(f"  New books to add: {len(new_books)}")
-        print(f"  Books to update (discovered→user_read): {len(updated_books)}")
+        logger.info(f"  New books to add: {len(new_books)}")
+        logger.info(f"  Books to update (discovered→user_read): {len(updated_books)}")
 
         # Step 3: Generate tags for books without them
-        print("[3/4] Generating emotion tags...")
+        logger.info("[3/4] Generating emotion tags...")
         tag_generator = TagGenerator()
 
         books_needing_tags = [b for b in new_books + updated_books if not b.tags]
@@ -600,7 +603,7 @@ def sync_from_google_sheets() -> dict:
                     book.tags = tags_dict[key]
 
         # Step 4: Update Vector DB
-        print("[4/4] Updating Vector DB...")
+        logger.info("[4/4] Updating Vector DB...")
 
         # Add new books
         if new_books:

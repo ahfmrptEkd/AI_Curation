@@ -9,6 +9,9 @@ from src.config import settings
 from src.data.models import Book
 import re
 from src.vectordb.embeddings import EmbeddingManager
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class ChromaManager:
@@ -107,7 +110,7 @@ class ChromaManager:
 
             added_count += len(batch)
             current_id += len(batch)
-            print(f"✓ Added batch {i//batch_size + 1}: {len(batch)} books (Total: {added_count})")
+            logger.info(f"✓ Added batch {i//batch_size + 1}: {len(batch)} books (Total: {added_count})")
 
         return added_count
 
@@ -245,7 +248,7 @@ class ChromaManager:
             )
 
             updated_count += len(batch_books)
-            print(f"✓ Updated batch {i//batch_size + 1}: {len(batch_books)} books (Total: {updated_count})")
+            logger.info(f"✓ Updated batch {i//batch_size + 1}: {len(batch_books)} books (Total: {updated_count})")
 
         return updated_count
 

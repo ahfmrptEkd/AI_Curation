@@ -8,6 +8,9 @@ from langchain.prompts import ChatPromptTemplate
 from typing import List, Dict
 from src.config import settings
 from src.data.models import Book
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class TagGenerator:
@@ -96,7 +99,7 @@ Extract emotion tags:""")
                 text = description
                 source = "description"
             else:
-                print(f"Warning: No review or description provided for '{title}'")
+                logger.warning(f"No review or description provided for '{title}'")
                 return ["#thought-provoking"]  # Default fallback
 
             # Use rating if provided, otherwise default to neutral
@@ -122,7 +125,7 @@ Extract emotion tags:""")
             return valid_tags
 
         except Exception as e:
-            print(f"Error generating tags for '{title}': {e}")
+            logger.error(f"Error generating tags for '{title}': {e}")
             return []
 
     def _parse_tags(self, tags_string: str) -> List[str]:
@@ -161,11 +164,11 @@ Extract emotion tags:""")
             if tag in self.AVAILABLE_TAGS:
                 valid_tags.append(tag)
             else:
-                print(f"Warning: Invalid tag '{tag}' - not in available list")
+                logger.warning(f"Invalid tag '{tag}' - not in available list")
 
         # Ensure we have at least 1 tag
         if not valid_tags:
-            print("Warning: No valid tags generated, using default")
+            logger.warning("No valid tags generated, using default")
             valid_tags = ["#thought-provoking"]  # Default fallback
 
         # Limit to 3 tags
@@ -185,7 +188,7 @@ Extract emotion tags:""")
         if not books:
             return {}
 
-        print(f"Processing {len(books)} books in batch...")
+        logger.info(f"Processing {len(books)} books in batch...")
 
         # Prepare all prompts
         prompts = []
@@ -218,16 +221,16 @@ Extract emotion tags:""")
                     tags = self._parse_tags(tags_string)
                     valid_tags = self._validate_tags(tags)
                     results[book.title] = valid_tags
-                    print(f"✓ {book.title}: {', '.join(valid_tags)}")
+                    logger.debug(f"✓ {book.title}: {', '.join(valid_tags)}")
                 except Exception as e:
-                    print(f"✗ Error processing '{book.title}': {e}")
+                    logger.error(f"Error processing '{book.title}': {e}")
                     results[book.title] = ["#thought-provoking"]  # Fallback
 
             return results
 
         except Exception as e:
-            print(f"Batch processing error: {e}")
-            print("Falling back to sequential processing...")
+            logger.error(f"Batch processing error: {e}")
+            logger.info("Falling back to sequential processing...")
 
             # Fallback: sequential processing
             results = {}

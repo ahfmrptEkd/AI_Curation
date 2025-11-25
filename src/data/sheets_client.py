@@ -15,6 +15,9 @@ from datetime import datetime
 
 from src.config import settings
 from src.data.models import Book
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 # Scopes required for Google Sheets and Drive access
@@ -89,10 +92,10 @@ class SheetsClient:
             )
             return creds
         except Exception as e:
-            print(f"Service Account authentication failed: {e}")
-            print("Make sure:")
-            print("1. credentials.json is a Service Account key file")
-            print("2. The Service Account email has access to your Google Sheet")
+            logger.error(f"Service Account authentication failed: {e}")
+            logger.error("Make sure:")
+            logger.error("1. credentials.json is a Service Account key file")
+            logger.error("2. The Service Account email has access to your Google Sheet")
             raise
 
     def _get_oauth_credentials(self) -> Credentials:
@@ -138,23 +141,23 @@ class SheetsClient:
 
         for worksheet_name in self.worksheet_names:
             try:
-                print(f"Loading from worksheet: {worksheet_name}")
+                logger.info(f"Loading from worksheet: {worksheet_name}")
                 worksheet = self.spreadsheet.worksheet(worksheet_name)
                 records = worksheet.get_all_records()
 
                 books_from_sheet = self._parse_books_from_records(records, worksheet_name)
                 all_books.extend(books_from_sheet)
 
-                print(f"✓ Loaded {len(books_from_sheet)} books from {worksheet_name}")
+                logger.info(f"✓ Loaded {len(books_from_sheet)} books from {worksheet_name}")
 
             except gspread.WorksheetNotFound:
-                print(f"⚠️  Worksheet '{worksheet_name}' not found, skipping...")
+                logger.warning(f"⚠️  Worksheet '{worksheet_name}' not found, skipping...")
                 continue
             except Exception as e:
-                print(f"Error loading from worksheet '{worksheet_name}': {e}")
+                logger.error(f"Error loading from worksheet '{worksheet_name}': {e}")
                 continue
 
-        print(f"\nTotal books loaded: {len(all_books)}")
+        logger.info(f"Total books loaded: {len(all_books)}")
         return all_books
 
     def _parse_books_from_records(self, records: List[dict], source_sheet: str = "") -> List[Book]:
@@ -197,7 +200,7 @@ class SheetsClient:
                 )
                 books.append(book)
             except Exception as e:
-                print(f"Error parsing book from {source_sheet}: {record.get('Book Title', 'Unknown')}: {e}")
+                logger.warning(f"Error parsing book from {source_sheet}: {record.get('Book Title', 'Unknown')}: {e}")
                 continue
 
         return books
@@ -233,7 +236,7 @@ class SheetsClient:
             # Find the row with matching title (search in "Book Title" column)
             cell = self.sheet.find(title)
             if not cell:
-                print(f"Book not found: {title}")
+                logger.warning(f"Book not found: {title}")
                 return False
 
             # Find Tags column index dynamically
@@ -244,17 +247,17 @@ class SheetsClient:
                 # If Tags column doesn't exist, add it
                 tags_col = len(headers) + 1
                 self.sheet.update_cell(1, tags_col, 'Tags')
-                print(f"Added 'Tags' column at position {tags_col}")
+                logger.info(f"Added 'Tags' column at position {tags_col}")
 
             tags_string = ",".join(tags)
 
             # Update the tags cell
             self.sheet.update_cell(cell.row, tags_col, tags_string)
-            print(f"✓ Updated tags for '{title}': {tags_string}")
+            logger.info(f"✓ Updated tags for '{title}': {tags_string}")
             return True
 
         except Exception as e:
-            print(f"Error updating tags for '{title}': {e}")
+            logger.error(f"Error updating tags for '{title}': {e}")
             return False
 
     def add_book(self, book: Book) -> bool:
@@ -303,10 +306,10 @@ class SheetsClient:
                 book.review                                    # J: Summary/Notes (user review)
             ]
             self.sheet.append_row(row)
-            print(f"✓ Added new book: '{book.title}'")
+            logger.info(f"✓ Added new book: '{book.title}'")
             return True
         except Exception as e:
-            print(f"Error adding book '{book.title}': {e}")
+            logger.error(f"Error adding book '{book.title}': {e}")
             return False
 
     def get_books_without_tags(self) -> List[Book]:
@@ -334,12 +337,12 @@ class SheetsClient:
             # Try to get existing worksheet
             try:
                 worksheet = self.spreadsheet.worksheet(worksheet_name)
-                print(f"⚠️  Worksheet '{worksheet_name}' already exists")
+                logger.warning(f"⚠️  Worksheet '{worksheet_name}' already exists")
 
                 # Check if it has headers
                 first_row = worksheet.row_values(1)
                 if first_row:
-                    print(f"   Current headers: {first_row}")
+                    logger.info(f"   Current headers: {first_row}")
                     return False
 
             except:
@@ -349,7 +352,7 @@ class SheetsClient:
                     rows=100,
                     cols=10
                 )
-                print(f"✓ Created new worksheet: '{worksheet_name}'")
+                logger.info(f"✓ Created new worksheet: '{worksheet_name}'")
 
             headers = [
                 "Month Completed",              # A: Month (auto-filled by add_book)
@@ -568,7 +571,7 @@ class SheetsClient:
                 })
 
             self.spreadsheet.batch_update({"requests": conditional_format_requests})
-            print(f"✓ Added conditional formatting for 12 months with colors")
+            logger.info(f"✓ Added conditional formatting for 12 months with colors")
 
             if include_sample_data:
                 sample_data = [
@@ -603,7 +606,7 @@ class SheetsClient:
             return True
 
         except Exception as e:
-            print(f"Error setting up worksheet '{worksheet_name}': {e}")
+            logger.error(f"Error setting up worksheet '{worksheet_name}': {e}")
             return False
 
     def get_spreadsheet_info(self) -> dict:

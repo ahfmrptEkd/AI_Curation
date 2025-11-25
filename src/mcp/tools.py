@@ -11,6 +11,9 @@ from src.agents.tag_generator import TagGenerator
 from src.vectordb.chroma_manager import ChromaManager
 from src.data.sheets_client import SheetsClient
 from src.data.models import Book
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class RecommendBooksParams(BaseModel):
@@ -38,14 +41,14 @@ class MCPToolHandler:
 
     def __init__(self):
         """Initialize all required components."""
-        print("[MCPToolHandler] Initializing components...")
+        logger.info("[MCPToolHandler] Initializing components...")
 
         self.recommender = BookRecommender()
         self.chroma_manager = ChromaManager(collection_name="books")
         self.tag_generator = TagGenerator()
         self.sheets_client = SheetsClient(use_service_account=True)
 
-        print("[MCPToolHandler] All components initialized successfully!")
+        logger.info("[MCPToolHandler] All components initialized successfully!")
 
     def handle_recommend(
         self,
@@ -67,7 +70,7 @@ class MCPToolHandler:
             Dictionary with status and recommendation data
         """
         try:
-            print(f"[handle_recommend] Query: {query}, Filters: category={category}, min_rating={min_rating}")
+            logger.debug(f"[handle_recommend] Query: {query}, Filters: category={category}, min_rating={min_rating}")
 
             # Build filters
             filters = {}
@@ -113,7 +116,7 @@ class MCPToolHandler:
             }
 
         except Exception as e:
-            print(f"[handle_recommend] Error: {e}")
+            logger.error(f"[handle_recommend] Error: {e}")
             return {
                 "status": "error",
                 "error": f"Failed to get recommendations: {str(e)}"
@@ -147,16 +150,16 @@ class MCPToolHandler:
             Dictionary with status and generated tags
         """
         try:
-            print(f"[handle_add_review] Adding review for '{title}' by {author}")
+            logger.info(f"[handle_add_review] Adding review for '{title}' by {author}")
 
             # Step 1: Generate emotion tags
-            print("[handle_add_review] Generating emotion tags...")
+            logger.info("[handle_add_review] Generating emotion tags...")
             tags = self.tag_generator.generate_tags(
                 title=title,
                 rating=rating,
                 review=review
             )
-            print(f"[handle_add_review] Generated tags: {tags}")
+            logger.info(f"[handle_add_review] Generated tags: {tags}")
 
             # Step 2: Create Book object
             book = Book(
@@ -171,24 +174,24 @@ class MCPToolHandler:
             )
 
             # Step 3: Add to Google Sheets
-            print("[handle_add_review] Adding to Google Sheets...")
+            logger.info("[handle_add_review] Adding to Google Sheets...")
             try:
                 success = self.sheets_client.add_book(book)
                 if success:
-                    print("[handle_add_review] ✅ Book added to Google Sheets")
+                    logger.info("[handle_add_review] ✅ Book added to Google Sheets")
                 else:
-                    print("[handle_add_review] ⚠️ Failed to add to Google Sheets (but Vector DB updated)")
+                    logger.warning("[handle_add_review] ⚠️ Failed to add to Google Sheets (but Vector DB updated)")
             except Exception as e:
-                print(f"[handle_add_review] ⚠️ Google Sheets error: {e} (but Vector DB updated)")
+                logger.warning(f"[handle_add_review] ⚠️ Google Sheets error: {e} (but Vector DB updated)")
 
             # Step 4: Update Vector DB
-            print("[handle_add_review] Updating Vector DB...")
+            logger.info("[handle_add_review] Updating Vector DB...")
             # Generate a unique ID for the book
             book_id = f"user_review_{title.lower().replace(' ', '_')}"
 
             # Upsert to Chroma
             self.chroma_manager.upsert_book(book, book_id)
-            print(f"[handle_add_review] Book added to Vector DB with ID: {book_id}")
+            logger.info(f"[handle_add_review] Book added to Vector DB with ID: {book_id}")
 
             return {
                 "status": "success",
@@ -202,7 +205,7 @@ class MCPToolHandler:
             }
 
         except Exception as e:
-            print(f"[handle_add_review] Error: {e}")
+            logger.error(f"[handle_add_review] Error: {e}")
             return {
                 "status": "error",
                 "error": f"Failed to add review: {str(e)}"
