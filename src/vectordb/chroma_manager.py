@@ -7,6 +7,7 @@ import chromadb
 from chromadb.config import Settings as ChromaSettings
 from src.config import settings
 from src.data.models import Book
+import re
 from src.vectordb.embeddings import EmbeddingManager
 
 
@@ -51,10 +52,20 @@ class ChromaManager:
         if use_numeric:
             return f"book_{numeric_id}"
         else:
+            # Normalize whitespace: strip and collapse multiple spaces
+            title_normalized = re.sub(r'\s+', ' ', book.title.strip())
+            author_normalized = re.sub(r'\s+', ' ', book.author.strip())
+            
             # Text-based ID from title and author
-            title_clean = book.title.lower().replace(" ", "_").replace("'", "").replace("[", "").replace("]", "")
-            author_clean = book.author.lower().replace(" ", "_").replace("'", "")
-            return f"{title_clean}_{author_clean}"[:100]  # Limit length
+            title_clean = title_normalized.lower().replace(" ", "_").replace("'", "").replace("[", "").replace("]", "")
+            author_clean = author_normalized.lower().replace(" ", "_").replace("'", "")
+            
+            # Combine and clean up underscores
+            book_id = f"{title_clean}_{author_clean}"
+            book_id = re.sub(r'_+', '_', book_id)  # __ -> _
+            book_id = book_id.strip('_')  # Remove leading/trailing underscores
+            
+            return book_id[:100]  # Limit length
 
     def add_books(self, books: List[Book], batch_size: int = 50, start_id: int = 0) -> int:
         """
