@@ -7,6 +7,7 @@ import chromadb
 from chromadb.config import Settings as ChromaSettings
 from src.config import settings
 from src.data.models import Book
+import re
 from src.vectordb.embeddings import EmbeddingManager
 
 
@@ -51,10 +52,20 @@ class ChromaManager:
         if use_numeric:
             return f"book_{numeric_id}"
         else:
+            # Normalize whitespace: strip and collapse multiple spaces
+            title_normalized = re.sub(r'\s+', ' ', book.title.strip())
+            author_normalized = re.sub(r'\s+', ' ', book.author.strip())
+            
             # Text-based ID from title and author
-            title_clean = book.title.lower().replace(" ", "_").replace("'", "").replace("[", "").replace("]", "")
-            author_clean = book.author.lower().replace(" ", "_").replace("'", "")
-            return f"{title_clean}_{author_clean}"[:100]  # Limit length
+            title_clean = title_normalized.lower().replace(" ", "_").replace("'", "").replace("[", "").replace("]", "")
+            author_clean = author_normalized.lower().replace(" ", "_").replace("'", "")
+            
+            # Combine and clean up underscores
+            book_id = f"{title_clean}_{author_clean}"
+            book_id = re.sub(r'_+', '_', book_id)  # __ -> _
+            book_id = book_id.strip('_')  # Remove leading/trailing underscores
+            
+            return book_id[:100]  # Limit length
 
     def add_books(self, books: List[Book], batch_size: int = 50, start_id: int = 0) -> int:
         """
@@ -336,103 +347,3 @@ class ChromaManager:
         return formatted
 
 
-if __name__ == "__main__":
-    # Test ChromaManager
-    print("=== Testing ChromaManager ===\n")
-
-    # Initialize manager
-    manager = ChromaManager(collection_name="test_books")
-
-    # Clear test collection
-    try:
-        manager.client.delete_collection("test_books")
-        manager = ChromaManager(collection_name="test_books")
-        print("✓ Cleared test collection\n")
-    except:
-        pass
-
-    # Create test books
-    test_books = [
-        Book(
-            title="The Love Hypothesis",
-            author="Ali Hazelwood",
-            rating=4.5,
-            review="Amazing fake dating story!",
-            trope="Fake Dating",
-            category="Romance",
-            tags=["#swoony", "#fun", "#heartwarming"],
-            description="A contemporary romantic comedy about a fake dating experiment."
-        ),
-        Book(
-            title="Beach Read",
-            author="Emily Henry",
-            rating=4.3,
-            review="Heartfelt and emotional.",
-            trope="Enemies to Lovers",
-            category="Romance",
-            tags=["#heartwarming", "#emotional", "#hopeful"],
-            description="Two writers challenge each other while spending summer as neighbors."
-        ),
-        Book(
-            title="Twisted Love",
-            author="Ana Huang",
-            rating=4.0,
-            review="Dark and intense.",
-            trope="Dark Romance",
-            category="Romance",
-            tags=["#dark", "#angsty", "#steamy"],
-            description="A grumpy bodyguard falls for his best friend's sister."
-        )
-    ]
-
-    # Test adding books
-    print("Adding test books...")
-    count = manager.add_books(test_books)
-    print(f"\n✅ Added {count} books")
-    print(f"Total books in collection: {manager.count()}\n")
-
-    # Test search
-    print("="*60)
-    print("\n🔍 Test 1: Basic semantic search")
-    print("Query: 'romantic comedy with humor'\n")
-
-    results = manager.search("romantic comedy with humor", n_results=2)
-    for i, result in enumerate(results, 1):
-        print(f"{i}. {result['metadata']['title']}")
-        print(f"   Score: {result['score']:.3f}")
-        print(f"   Tags: {result['metadata']['tags']}")
-        print()
-
-    # Test filtered search
-    print("="*60)
-    print("\n🔍 Test 2: Filtered search (Dark Romance only)")
-    print("Query: 'intense romance'\n")
-
-    results = manager.search(
-        "intense romance",
-        filters={"trope": "Dark Romance"},
-        n_results=2
-    )
-    for i, result in enumerate(results, 1):
-        print(f"{i}. {result['metadata']['title']}")
-        print(f"   Trope: {result['metadata']['trope']}")
-        print(f"   Score: {result['score']:.3f}")
-        print()
-
-    # Test rating filter
-    print("="*60)
-    print("\n🔍 Test 3: High-rated books (>= 4.3)")
-    print("Query: 'heartwarming story'\n")
-
-    results = manager.search(
-        "heartwarming story",
-        filters={"rating": {"$gte": 4.3}},
-        n_results=2
-    )
-    for i, result in enumerate(results, 1):
-        print(f"{i}. {result['metadata']['title']}")
-        print(f"   Rating: {result['metadata']['rating']}⭐")
-        print(f"   Score: {result['score']:.3f}")
-        print()
-
-    print("✅ ChromaManager test complete!")

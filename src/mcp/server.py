@@ -374,40 +374,86 @@ def discover_new_books(
         api_client = BookMetadataFetcher()
         discovered_books = []
 
-        # Author-based search (most reliable)
-        if include_authors:
-            books = api_client.search_romance_books(
-                max_books=max_books
-            )
-            for book_data in books:
-                title = book_data.get('title', '').strip()
-                authors_list = book_data.get('authors', [])
-                author_name = authors_list[0] if authors_list else ''
-                author_name = author_name.strip() if author_name else ''
-
-                if not author_name:
-                    continue
-
-                key = (title.lower(), author_name.lower())
-                if key in existing_titles:
-                    results["books_skipped"] += 1
-                    continue
-
-                book = Book(
-                    title=title,
-                    author=author_name,
-                    rating=3.0,  # Neutral rating for discovered books (not yet rated by user)
-                    review="",
-                    category=book_data.get('category', 'Romance'),
-                    trope="",
-                    source="discovered",
-                    description=book_data.get('description', '')
-                )
-                discovered_books.append(book)
-                existing_titles.add(key)
-
-                if len(discovered_books) >= max_books:
+        if include_authors and include_keywords:
+            # Full hybrid search (authors + keywords)
+            print("  Using hybrid search (authors + keywords)...")
+            books = api_client.search_romance_books(max_books=max_books)
+        elif include_authors:
+            # Author-only search (default, most reliable)
+            print("  Using author-based search only...")
+            books = []
+            authors = [
+                'Emily Henry', 'Colleen Hoover', 'Ali Hazelwood',
+                'Lucy Score', 'Tessa Bailey', 'Beth O Leary',
+                'Christina Lauren', 'Abby Jimenez',
+                'Penelope Douglas', 'L.J. Shen', 'H.D. Carlton',
+                'Hannah Grace', 'Elle Kennedy', 'Kennedy Ryan',
+                'Ilsa Madden-Mills',
+                'Sarah J. Maas', 'Rebecca Yarros',
+                'Jennifer L. Armentrout', 'Carissa Broadbent',
+                'Lisa Kleypas', 'Tessa Dare',
+            ]
+            for author in authors:
+                author_books = api_client._search_by_author(author, min_year=2020)
+                books.extend(author_books)
+                if len(books) >= max_books:
                     break
+            books = api_client._deduplicate_books(books[:max_books])
+        elif include_keywords:
+            # Keyword-only search (for diversity)
+            print("  Using keyword-based search only...")
+            books = []
+            keywords = [
+                'enemies to lovers romance',
+                'second chance romance',
+                'fake relationship romance',
+                'forced proximity romance',
+                'grumpy sunshine romance',
+                'sports romance',
+                'office romance',
+                'small town romance',
+                'billionaire romance',
+                'royal romance',
+            ]
+            for keyword in keywords:
+                keyword_books = api_client._search_by_keyword(keyword, min_year=2020)
+                books.extend(keyword_books)
+                if len(books) >= max_books:
+                    break
+            books = api_client._deduplicate_books(books[:max_books])
+        else:
+            print("  Warning: Both include_authors and include_keywords are False. No books will be discovered.")
+            books = []
+
+        for book_data in books:
+            title = book_data.get('title', '').strip()
+            authors_list = book_data.get('authors', [])
+            author_name = authors_list[0] if authors_list else ''
+            author_name = author_name.strip() if author_name else ''
+
+            if not author_name:
+                continue
+
+            key = (title.lower(), author_name.lower())
+            if key in existing_titles:
+                results["books_skipped"] += 1
+                continue
+
+            book = Book(
+                title=title,
+                author=author_name,
+                rating=3.0,  # Neutral rating for discovered books (not yet rated by user)
+                review="",
+                category=book_data.get('category', 'Romance'),
+                trope="",
+                source="discovered",
+                description=book_data.get('description', '')
+            )
+            discovered_books.append(book)
+            existing_titles.add(key)
+
+            if len(discovered_books) >= max_books:
+                break
 
         results["books_discovered"] = len(discovered_books)
         print(f"  Discovered {len(discovered_books)} new books")
@@ -638,22 +684,3 @@ def add_book_review(
     )
 
 
-if __name__ == "__main__":
-    # Run the MCP server
-    print("="*60)
-    print("📚 Book Curator MCP Server")
-    print("="*60)
-    print("\nStarting server...")
-    print("This server provides Romance book recommendations via MCP.\n")
-    print("Available tools:")
-    print("  1. recommend_books - Get personalized recommendations")
-    print("  2. add_book_review - Add a new book review")
-    print("  3. sync_from_google_sheets - Sync Sheets to Vector DB")
-    print("  4. check_system_status - Check system health")
-    print("  5. discover_new_books - Find new Romance books")
-    print("  6. setup_google_sheets - Initialize Sheets structure")
-    print("\nServer is ready for connections from Claude Desktop.")
-    print("="*60 + "\n")
-
-    # Start the FastMCP server (stdio mode for Claude Desktop)
-    mcp.run()

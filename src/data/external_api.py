@@ -222,7 +222,8 @@ class BookMetadataFetcher:
             all_books.extend(author_books)
             print(f"  {author:25s}: {len(author_books):2d} books")
 
-        print(f"\n  Subtotal from authors: {len(all_books)} books")
+        author_subtotal = len(all_books)
+        print(f"\n  Subtotal from authors: {author_subtotal} books")
 
         # STEP 2: Keyword-based search (30%)
         print("\n🔑 STEP 2: Keyword-based search")
@@ -249,7 +250,9 @@ class BookMetadataFetcher:
             all_books.extend(keyword_books)
             print(f"  {keyword:30s}: {len(keyword_books):2d} books")
 
-        print(f"\n  Subtotal from keywords: {len(all_books) - sum(len(self._search_by_author(a, min_year)) for a in authors)} books")
+        # Calculate keyword subtotal without re-querying
+        keyword_subtotal = len(all_books) - author_subtotal
+        print(f"\n  Subtotal from keywords: {keyword_subtotal} books")
 
         # STEP 3: Deduplication
         print("\n🔄 STEP 3: Deduplication")
@@ -501,61 +504,3 @@ class BookMetadataFetcher:
         return unique_books
 
 
-if __name__ == "__main__":
-    # Test the metadata fetcher
-    print("=== Testing BookMetadataFetcher ===\n")
-
-    fetcher = BookMetadataFetcher()
-
-    # Test 1: Popular Romance book
-    print("Test 1: The Love Hypothesis by Ali Hazelwood")
-    print("-" * 60)
-
-    result = fetcher.fetch_google_books("The Love Hypothesis", "Ali Hazelwood")
-
-    if result:
-        print(f"✅ Found!")
-        print(f"Title: {result['title']}")
-        print(f"Authors: {', '.join(result['authors'])}")
-        print(f"Description: {result['description'][:100]}...")
-        print(f"Categories: {result['categories']}")
-        print(f"ISBN-13: {result['isbn_13']}")
-        print(f"Published: {result['published_date']}")
-        print(f"Pages: {result['page_count']}")
-        print(f"Thumbnail: {result['thumbnail']}")
-    else:
-        print("❌ Not found")
-
-    print("\n" + "="*60 + "\n")
-
-    # Test 2: Enrich with Open Library cover
-    print("Test 2: Enriched metadata with Open Library cover")
-    print("-" * 60)
-
-    enriched = fetcher.enrich_book_metadata("Beach Read", "Emily Henry")
-
-    if enriched:
-        print(f"✅ Enriched!")
-        print(f"Title: {enriched['title']}")
-        print(f"Description: {enriched['description'][:100]}...")
-        print(f"Cover URL: {enriched['thumbnail']}")
-    else:
-        print("❌ Not found")
-
-    print("\n" + "="*60 + "\n")
-
-    # Test 3: Another Romance book
-    print("Test 3: Icebreaker by Hannah Grace")
-    print("-" * 60)
-
-    result = fetcher.fetch_google_books("Icebreaker", "Hannah Grace")
-
-    if result:
-        print(f"✅ Found!")
-        print(f"Title: {result['title']}")
-        print(f"Authors: {', '.join(result['authors'])}")
-        print(f"Description: {result['description'][:150] if result['description'] else 'N/A'}...")
-    else:
-        print("❌ Not found")
-
-    print("\n✅ Metadata fetcher test complete!")
