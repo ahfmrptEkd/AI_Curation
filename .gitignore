@@ -37,3 +37,6 @@ sample_books.csv
 
 # logs
 logs/
+
+# Auto Claude data directory
+.auto-claude/
